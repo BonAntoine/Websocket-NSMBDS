@@ -1,0 +1,11 @@
+{
+  "name": "nsmb-minijeux",
+  "private": true,
+  "packageManager": "pnpm@12.21.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "build": "pnpm --filter client build",
+    "start": "pnpm --filter server start",
+    "check": "pnpm -r run check"
+  }
+}
