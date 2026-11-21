@@ -3,6 +3,8 @@ import type { Container, Ticker } from 'pixi.js';
 /** Taille d'un écran virtuel, en pixels "DS". Le runner le met à l'échelle de l'appareil. */
 export const SCREEN_W = 256;
 export const SCREEN_H = 192;
+/** Bas de l'écran du haut réservé aux scores des joueurs (dessinés par le runner, pas par le jeu). */
+export const SCORE_BAR_H = 26;
 
 /** Ce que reçoit un mini-jeu pour un niveau : deux "écrans" empilés façon DS. */
 export interface GameView {
@@ -10,7 +12,7 @@ export interface GameView {
   seed: number;
   /** Chrono global restant au début du niveau. */
   timeLeftMs: number;
-  /** Écran du haut (infos), coordonnées 0..SCREEN_W × 0..SCREEN_H. */
+  /** Écran du haut (infos), coordonnées 0..SCREEN_W × 0..SCREEN_H, dont SCORE_BAR_H en bas pour les scores. */
   top: Container;
   /** Écran du bas (zone tactile), mêmes coordonnées. */
   bottom: Container;

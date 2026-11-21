@@ -35,7 +35,15 @@ button, input {
   border: none;
   padding: 14px 16px;
 }
-input { background: var(--panel); color: var(--text); width: 100%; }
+input {
+  background: var(--text);
+  color: var(--bg);
+  width: 100%;
+  border: 2px solid transparent;
+  outline: none;
+}
+input::placeholder { color: #8a86a3; }
+input:focus { border-color: var(--accent); }
 button { background: var(--accent); color: #1d1b2f; font-weight: 700; cursor: pointer; }
 button:disabled { opacity: 0.4; }
 button.secondary { background: var(--panel); color: var(--text); }

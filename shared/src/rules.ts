@@ -3,7 +3,7 @@ export const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 export const CODE_LENGTH = 4;
 
 export const MIN_PLAYERS = 2;
-export const MAX_PLAYERS = 4;
+export const MAX_PLAYERS = 8;
 export const NAME_MAX_LENGTH = 12;
 
 /** Chrono global de la partie. Il ne défile que pendant le jeu et n'est jamais rechargé. */

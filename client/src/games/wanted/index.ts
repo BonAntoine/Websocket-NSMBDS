@@ -73,23 +73,27 @@ export const wanted: MiniGame = {
     };
 
     // --- Écran du haut : chrono + avis de recherche derrière des rideaux --------------------
-    const timeValue = text(String(Math.ceil(view.timeLeftMs / 1000)), 22);
-    timeValue.position.set(128, 32);
-    const timeLabel = text('TEMPS', 10, 0xa7a3c2, false);
-    timeLabel.position.set(128, 11);
-    const poster = new Graphics().roundRect(78, 50, 100, 134, 6).fill(0xf4e3c1).stroke({ color: 0x1d1b2f, width: 3 });
+    // Le bas de l'écran (SCORE_BAR_H) est réservé aux scores, dessinés par le runner.
+    const levelLabel = text(`NIVEAU ${view.round}`, 9, 0xa7a3c2, false);
+    levelLabel.anchor.set(0, 0.5);
+    levelLabel.position.set(8, 9);
+    const timeLabel = text('TEMPS', 9, 0xa7a3c2, false);
+    timeLabel.position.set(128, 8);
+    const timeValue = text(String(Math.ceil(view.timeLeftMs / 1000)), 20);
+    timeValue.position.set(128, 25);
+    const poster = new Graphics().roundRect(78, 40, 100, 122, 6).fill(0xf4e3c1).stroke({ color: 0x1d1b2f, width: 3 });
     const title = text('RECHERCHÉ', 12, 0x8b2e16, false);
-    title.position.set(128, 66);
+    title.position.set(128, 54);
     const face = new Sprite(texture(FACES[level.wanted]));
     face.anchor.set(0.5);
-    face.setSize(64);
-    face.position.set(128, 128);
+    face.setSize(60);
+    face.position.set(128, 108);
 
     const curtains = new Container();
-    const curtainMask = new Graphics().rect(78, 50, 100, 134).fill(0xffffff);
-    const curtainL = new Graphics().rect(-50, 0, 50, 134).fill(0xa4161a).rect(-5, 0, 5, 134).fill(0x6a040f);
-    const curtainR = new Graphics().rect(0, 0, 50, 134).fill(0xa4161a).rect(0, 0, 5, 134).fill(0x6a040f);
-    curtainL.y = curtainR.y = 50;
+    const curtainMask = new Graphics().rect(78, 40, 100, 122).fill(0xffffff);
+    const curtainL = new Graphics().rect(-50, 0, 50, 122).fill(0xa4161a).rect(-5, 0, 5, 122).fill(0x6a040f);
+    const curtainR = new Graphics().rect(0, 0, 50, 122).fill(0xa4161a).rect(0, 0, 5, 122).fill(0x6a040f);
+    curtainL.y = curtainR.y = 40;
     curtains.addChild(curtainMask, curtainL, curtainR);
     curtains.mask = curtainMask;
     /** 0 = fermés, 1 = ouverts. */
@@ -98,13 +102,13 @@ export const wanted: MiniGame = {
       curtainR.x = 128 + 50 * open;
     };
     setCurtains(0);
-    top.addChild(new Graphics().rect(0, 0, SCREEN_W, SCREEN_H).fill(0x2b2945), timeLabel, timeValue, poster, title, face, curtains);
+    top.addChild(new Graphics().rect(0, 0, SCREEN_W, SCREEN_H).fill(0x2b2945), levelLabel, timeLabel, timeValue, poster, title, face, curtains);
 
     // --- Écran du bas : la foule -----------------------------------------------------------
     const crowd = new Container();
     const effects = new Container();
     crowd.visible = false;
-    bottom.addChild(new Graphics().rect(0, 0, SCREEN_W, SCREEN_H).fill(0xf4f1ea), crowd, effects);
+    bottom.addChild(new Graphics().rect(0, 0, SCREEN_W, SCREEN_H).fill(0x000000), crowd, effects);
 
     const pics: LivePicture[] = level.pictures.map((p) => {
       const sprite = new Sprite(texture(FACES[p.character]));
@@ -246,18 +250,15 @@ export const wanted: MiniGame = {
         if (o.winnerTimeMs !== null) timeValue.text = String(Math.ceil((view.timeLeftMs - o.winnerTimeMs) / 1000));
         status.text = o.isMe ? 'Bravo ! +1' : o.winnerName ? `${o.winnerName} a trouvé ! ${fmt(o.winnerTimeMs!)}` : 'Temps écoulé !';
 
-        // Tous disparaissent sauf la cible ; un cercle s'ouvre depuis le centre.
+        // Tous disparaissent sauf la cible ; un cercle de lumière s'ouvre depuis le centre.
         for (const p of pics) p.sprite.visible = false;
-        const shade = new Graphics().rect(0, 0, SCREEN_W, SCREEN_H).fill({ color: 0x1d1b2f, alpha: 0.85 });
-        const hole = new Graphics();
-        shade.setMask({ mask: hole, inverse: true });
+        const spotlight = new Graphics();
         target.sprite.visible = true;
-        effects.addChildAt(hole, 0);
-        effects.addChildAt(shade, 1);
-        effects.addChildAt(target.sprite, 2);
+        effects.addChildAt(spotlight, 0);
+        effects.addChildAt(target.sprite, 1);
         void tween(IRIS_MS, (k) =>
-          hole.clear().circle(128, 96, IRIS_FROM + (IRIS_TO - IRIS_FROM) * k).fill(0xffffff),
-        ).then(() => (shade.visible = false));
+          spotlight.clear().circle(128, 96, IRIS_FROM + (IRIS_TO - IRIS_FROM) * k).fill(0x2b2945),
+        );
 
         playSound(o.winnerName ? 'wanted.found' : 'wanted.fail');
         playSound(VOICES[level.wanted], { rate: voiceRate });

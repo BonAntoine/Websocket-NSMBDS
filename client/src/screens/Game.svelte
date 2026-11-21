@@ -7,15 +7,14 @@
   import { loadAssets } from '../assets/assets';
   import { loadSounds } from '../assets/sounds';
   import { games } from '../games';
-  import type { RoundInstance } from '../games/types';
-  import { createRound } from '../game/round';
+  import { createRound, type RoundHandle } from '../game/round';
 
   let { room }: { room: RoomState } = $props();
 
   let host: HTMLDivElement;
   let pixi: Application | undefined = $state();
   let hasRound = $state(false);
-  let current: { round: number; instance: RoundInstance; finished: boolean } | null = null;
+  let current: { round: number; instance: RoundHandle; finished: boolean } | null = null;
 
   onMount(() => {
     const app = new Application();
@@ -53,6 +52,7 @@
     });
     current = { round: start.round, instance, finished: false };
     hasRound = true;
+    untrack(() => instance.setScores(room.players, playerId));
     const d = untrack(() => store.deadline);
     if (d?.round === start.round) instance.setDeadline(d.timeMs);
     instance
@@ -65,6 +65,12 @@
   $effect(() => {
     const d = store.deadline;
     if (d && current?.round === d.round) current.instance.setDeadline(d.timeMs);
+  });
+
+  // Scores en bas de l'écran du haut, à chaque changement (trouvaille, erreur, déconnexion).
+  $effect(() => {
+    const players = room.players;
+    if (current) current.instance.setScores(players, playerId);
   });
 
   $effect(() => {
@@ -82,13 +88,6 @@
 </script>
 
 <div class="game">
-  <header>
-    {#each room.players as p (p.id)}
-      <span class:me={p.id === playerId} class:off={!p.connected}>{p.name} <b>{p.score}</b></span>
-    {/each}
-    <span class="round">Niveau {room.round}</span>
-  </header>
-
   <div class="area">
     <div class="stage" bind:this={host}></div>
     {#if !hasRound}
@@ -104,18 +103,6 @@
     display: flex;
     flex-direction: column;
   }
-  header {
-    display: flex;
-    gap: 12px;
-    padding: 8px 12px;
-    font-size: 0.9rem;
-    background: var(--panel);
-    overflow: hidden;
-    white-space: nowrap;
-  }
-  header .me { color: var(--accent); }
-  header .off { opacity: 0.4; }
-  header .round { margin-left: auto; color: var(--muted); }
   .area {
     flex: 1;
     position: relative;

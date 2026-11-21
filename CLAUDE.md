@@ -1,6 +1,6 @@
 # Mini-jeux NSMB DS — contexte projet
 
-Recréer des mini-jeux inspirés de New Super Mario Bros DS, jouables **sur smartphone dans le navigateur**, en multijoueur **en ligne** (2 à 4 joueurs, pas forcément sur le même réseau) via des **codes de room**.
+Recréer des mini-jeux inspirés de New Super Mario Bros DS, jouables **sur smartphone dans le navigateur**, en multijoueur **en ligne** (2 à 8 joueurs, pas forcément sur le même réseau) via des **codes de room**.
 
 **Règle n°1 : ne pas over-engineer.** Code minimaliste, lisible, maintenable. Pas de BDD, pas d'auth, pas de chat, pas d'abstraction "au cas où".
 
@@ -12,7 +12,7 @@ Recréer des mini-jeux inspirés de New Super Mario Bros DS, jouables **sur smar
 | Front | **Svelte** + Vite + TypeScript. Svelte uniquement pour les écrans hors jeu (accueil, saisie code, lobby, résultats). Le jeu vit dans le canvas Pixi. |
 | Serveur | **Node + socket.io** seul (NestJS écarté : trop lourd pour le besoin). |
 | Repo | Petit monorepo **pnpm workspaces** : `client/`, `server/`, `shared/`. |
-| Joueurs | 2 à 4 par room, comme sur la DS. |
+| Joueurs | 2 à 8 par room (`MAX_PLAYERS`). Scores affichés sur 1 ligne jusqu'à 4 joueurs, 2 lignes au-delà. |
 | Premier mini-jeu | **Wanted!** — sert aussi à poser la logique générale (rooms, manches, scores). |
 | Graphismes | Formes simples pour prototyper, **pas d'assets Nintendo** (sprites/personnages). Doivent être remplaçables sans toucher au code (voir Assets). |
 | Chat | Aucun, hors périmètre. |
@@ -62,7 +62,7 @@ Chaque client fait **tourner le jeu en local**, à partir du seed partagé.
 
 ## Format mobile
 
-- **Portrait**, deux "écrans" empilés façon DS : écran du haut = infos (le personnage recherché, scores), écran du bas = zone tactile de jeu.
+- **Portrait**, deux "écrans" empilés façon DS : écran du haut = infos (le personnage recherché, et en bas la barre des scores dessinée par le runner), écran du bas = zone tactile de jeu (fond noir).
 - Entrées via les pointer events de PixiJS.
 
 ## Assets (remplaçables)
