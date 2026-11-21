@@ -1,16 +1,15 @@
 import { randomInt } from 'node:crypto';
 import type { Server, Socket } from 'socket.io';
 import {
-  BETWEEN_ROUNDS_MS,
   CODE_ALPHABET,
   CODE_LENGTH,
-  COUNTDOWN_MS,
+  MATCH_TIME_MS,
   MAX_PLAYERS,
   MIN_PLAYERS,
   NAME_MAX_LENGTH,
   RESULT_GRACE_MS,
-  ROUND_LIMIT_MS,
-  ROUNDS_PER_MATCH,
+  ROUND_END_MS,
+  ROUND_INTRO_MAX_MS,
   normalizeCode,
   type ClientToServer,
   type HandshakeAuth,
@@ -39,9 +38,15 @@ interface Room {
   hostId: string;
   phase: Phase;
   players: Map<string, Player>;
+  /** Seed de la partie (constant d'un niveau à l'autre). */
+  seed: number;
   round: number;
   roundOpen: boolean;
-  /** Joueurs connectés au départ de la manche : on attend leur résultat. */
+  /** Chrono global restant au début du niveau en cours. */
+  timeLeftMs: number;
+  /** Meilleur temps reçu pour ce niveau : les autres jouent jusqu'à ce temps. */
+  deadlineMs: number | null;
+  /** Joueurs connectés au départ du niveau : on attend leur résultat. */
   participants: string[];
   results: Map<string, number | null>;
   timer?: NodeJS.Timeout;
@@ -69,7 +74,6 @@ export function registerRooms(io: IO) {
       hostId: room.hostId,
       phase: room.phase,
       round: room.round,
-      totalRounds: ROUNDS_PER_MATCH,
       players: [...room.players.values()].map((p) => ({
         id: p.id,
         name: p.name,
@@ -106,17 +110,24 @@ export function registerRooms(io: IO) {
   function startRound(room: Room) {
     room.round++;
     room.roundOpen = true;
+    room.deadlineMs = null;
     room.participants = connectedIds(room);
     room.results = new Map();
     broadcast(room);
-    io.to(room.code).emit('round:start', { round: room.round, game: 'wanted', seed: randomInt(2 ** 31) });
-    // Filet de sécurité si un joueur ne répond jamais (déconnexion).
-    room.timer = setTimeout(() => endRound(room), COUNTDOWN_MS + ROUND_LIMIT_MS + RESULT_GRACE_MS);
+    io.to(room.code).emit('round:start', {
+      round: room.round,
+      game: 'wanted',
+      seed: room.seed,
+      timeLeftMs: room.timeLeftMs,
+    });
+    // Filet de sécurité si un joueur ne répond jamais.
+    room.timer = setTimeout(() => endRound(room), ROUND_INTRO_MAX_MS + room.timeLeftMs + RESULT_GRACE_MS);
   }
 
   function checkRoundComplete(room: Room) {
-    // On attend TOUS les participants : le premier message reçu n'est pas forcément le plus rapide.
-    if (room.participants.every((id) => room.results.has(id) || !room.players.has(id))) endRound(room);
+    // On attend TOUS les participants encore connectés : le premier message reçu n'est pas forcément le plus rapide.
+    const waiting = room.participants.some((id) => !room.results.has(id) && room.players.get(id)?.socketId);
+    if (!waiting) endRound(room);
   }
 
   function endRound(room: Room) {
@@ -133,18 +144,20 @@ export function registerRooms(io: IO) {
     }
     const winner = winnerId ? room.players.get(winnerId) : undefined;
     if (winner) winner.score++;
+    // Le chrono global a défilé jusqu'à la trouvaille (ou jusqu'au bout si personne n'a trouvé).
+    room.timeLeftMs = winnerId ? Math.max(0, room.timeLeftMs - times[winnerId]!) : 0;
 
     io.to(room.code).emit('round:end', { round: room.round, winnerId, times });
     broadcast(room);
 
     room.timer = setTimeout(() => {
-      if (room.round >= ROUNDS_PER_MATCH) {
+      if (room.timeLeftMs <= 0) {
         room.phase = 'results';
         broadcast(room);
       } else {
         startRound(room);
       }
-    }, BETWEEN_ROUNDS_MS);
+    }, ROUND_END_MS);
   }
 
   io.on('connection', (socket: ClientSocket) => {
@@ -162,6 +175,11 @@ export function registerRooms(io: IO) {
       if (oldSocketId && oldSocketId !== socket.id) io.sockets.sockets.get(oldSocketId)?.disconnect(true);
       room = r;
       socket.join(r.code);
+      // Revenu en plein niveau sans l'avoir terminé : il reprendra au suivant, on ne l'attend pas.
+      if (r.roundOpen && !r.results.has(p.id)) {
+        r.participants = r.participants.filter((id) => id !== p.id);
+        checkRoundComplete(r);
+      }
       broadcast(r);
     }
 
@@ -184,8 +202,11 @@ export function registerRooms(io: IO) {
         hostId: playerId,
         phase: 'lobby',
         players: new Map(),
+        seed: 0,
         round: 0,
         roundOpen: false,
+        timeLeftMs: MATCH_TIME_MS,
+        deadlineMs: null,
         participants: [],
         results: new Map(),
       };
@@ -220,6 +241,8 @@ export function registerRooms(io: IO) {
       if (connectedIds(room).length < MIN_PLAYERS) return;
       for (const p of room.players.values()) p.score = 0;
       room.round = 0;
+      room.seed = randomInt(2 ** 31);
+      room.timeLeftMs = MATCH_TIME_MS;
       room.phase = 'playing';
       startRound(room);
     });
@@ -228,8 +251,22 @@ export function registerRooms(io: IO) {
       if (!room?.roundOpen || p?.round !== room.round) return;
       if (!room.participants.includes(playerId) || room.results.has(playerId)) return;
       const t = p.timeMs;
-      room.results.set(playerId, typeof t === 'number' && Number.isFinite(t) && t >= 0 ? t : null);
+      const valid = typeof t === 'number' && Number.isFinite(t) && t >= 0 && t <= room.timeLeftMs;
+      room.results.set(playerId, valid ? t : null);
+      // Premier (ou meilleur) temps : les autres jouent jusqu'à ce temps sur leur propre chrono, puis répondent.
+      if (valid && (room.deadlineMs === null || t < room.deadlineMs)) {
+        room.deadlineMs = t;
+        io.to(room.code).emit('round:deadline', { round: room.round, timeMs: t });
+      }
       checkRoundComplete(room);
+    });
+
+    socket.on('round:miss', (p) => {
+      if (!room?.roundOpen || p?.round !== room.round || !room.participants.includes(playerId)) return;
+      const player = room.players.get(playerId);
+      if (!player) return;
+      player.score--;
+      broadcast(room);
     });
 
     socket.on('disconnect', () => {
@@ -238,6 +275,7 @@ export function registerRooms(io: IO) {
       if (!r || !player || player.socketId !== socket.id) return;
       player.socketId = null;
       player.leaveTimer = setTimeout(() => removePlayer(r, playerId), RECONNECT_GRACE_MS);
+      if (r.roundOpen) checkRoundComplete(r);
       broadcast(r);
     });
   });

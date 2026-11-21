@@ -40,9 +40,10 @@ Chaque client fait **tourner le jeu en local**, à partir du seed partagé.
 
 ### Équité malgré la latence variable
 
-- Le serveur envoie le départ de manche ; **chaque client lance son propre compte à rebours / "Go" local** à réception.
+- Le serveur envoie le départ de niveau ; **chaque client lance sa propre intro / "Go" local** à réception.
 - Chaque client mesure le **temps de réaction depuis son propre "Go"** et l'envoie au serveur. Un joueur qui reçoit le départ 200 ms plus tard démarre aussi son chrono 200 ms plus tard → aucune pénalité.
-- **Le serveur ne déclare jamais le gagnant au premier message reçu** : il attend les résultats de **tous** les joueurs (avec un timeout de quelques secondes pour gérer une déconnexion), puis compare les temps. Le premier message arrivé n'est pas forcément le plus rapide.
+- **Échéance** : dès qu'un temps T arrive, le serveur le diffuse (`round:deadline`). Chaque client continue de jouer **jusqu'à T sur son propre chrono**, puis répond `null` s'il n'a pas trouvé. Un joueur en retard réseau n'est donc jamais coupé avant d'avoir eu le même temps.
+- **Le serveur ne déclare jamais le gagnant au premier message reçu** : il attend les résultats de **tous** les joueurs connectés (avec un timeout pour gérer une déconnexion), puis compare les temps. Le premier message arrivé n'est pas forcément le plus rapide.
 - **Triche acceptée** : un client pourrait mentir sur son temps. Partie entre amis → pas de protection anti-triche pour l'instant, ne pas en ajouter.
 
 ## Un seul processus Node en prod
@@ -78,7 +79,12 @@ Remplacer les graphismes = déposer les fichiers + modifier le manifeste. Zéro 
 
 Chaque mini-jeu est un **module isolé** (ex. `client/src/games/wanted/`) qui reçoit le seed et une zone d'affichage, et renvoie un résultat. Ajouter un jeu ne doit pas toucher aux autres.
 
-- **Wanted!** — à faire en premier. Un personnage "recherché" est affiché en haut ; le joueur doit le trouver et le toucher parmi une foule en bas. Premier à le toucher (temps de réaction le plus court) gagne la manche.
+- **Wanted!** — fidèle au Wanted! de SM64DS (source décompilée : `../sm64ds-decomp/src/minigames/d_s_mg_luigi.cpp`), adapté en multijoueur :
+  - chrono global (`MATCH_TIME_MS`) qui ne défile que pendant le jeu, sans recharge ; la partie s'arrête à 0 (pas de game over) ;
+  - le premier qui trouve (temps le plus court) : +1 et niveau suivant pour tout le monde ; chaque mauvais toucher : -1 ;
+  - progression d'origine : plateaux 1 à 20 dans l'ordre, puis tirage parmi 11–20 ; transition spéciale tous les 5 niveaux ;
+  - jeu en **pixels DS virtuels** (deux écrans 256 × 192 mis à l'échelle) : vitesses, zones de toucher, tailles d'origine.
+  - Tables marquées `[DEVINÉ]` dans `games/wanted/boards.ts` : absentes du dépôt de décompilation (pas de ROM), à corriger si on les retrouve.
 - **Trampoline Time** — plus tard. Le joueur trace des trampolines au doigt, des personnages rebondissent dessus ; rendu en 3D dans l'original. Options à trancher le moment venu : Three.js pour ce jeu uniquement, ou fausse 3D dans PixiJS.
 
 ## État actuel / prochaines étapes
@@ -86,7 +92,7 @@ Chaque mini-jeu est un **module isolé** (ex. `client/src/games/wanted/`) qui re
 Fait (voir `README.md` pour la structure, `DEPLOY.md` pour Debian) :
 - Monorepo pnpm, TypeScript 6 (svelte-check ne supporte pas encore TS 7 seul). Serveur lancé via `tsx` (dev et prod).
 - Serveur : HTTP + statiques (sirv) + socket.io, rooms, reconnexion (playerId + code envoyés dans le handshake `auth`), attente de tous les résultats + timeout.
-- Client : écrans Svelte, manche (`client/src/game/round.ts`), assets par clé + manifeste, Wanted! (3 modes : immobile, défilement, rebonds ; mauvais tap = +1 s).
+- Client : écrans Svelte, mise en place des deux écrans (`client/src/game/round.ts`), textures et sons par clé + manifeste (sons synthétisés WebAudio par défaut), Wanted! fidèle à l'original (voir Mini-jeux).
 - Les personnages sont des formes génériques (`wanted.face.a`…`d`), pas des personnages Nintendo.
 
 Prochaines étapes possibles :

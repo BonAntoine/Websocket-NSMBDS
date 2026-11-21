@@ -28,15 +28,16 @@ shared/   PRNG (mulberry32), règles/constantes, types des événements socket
 server/   HTTP + statiques + socket.io ; rooms en mémoire (rooms.ts)
 client/
   src/screens/        écrans Svelte : Home, Lobby, Game, Results
-  src/game/round.ts   déroulé d'une manche : écrans haut/bas, compte à rebours, "Go"
+  src/game/round.ts   mise en place d'un niveau : deux écrans virtuels 256 × 192 mis à l'échelle
   src/games/          un dossier par mini-jeu (contrat dans games/types.ts)
-  src/assets/         manifeste des graphismes (clé → forme / fichier / spritesheet)
+  src/assets/         manifeste des graphismes et des sons (clé → forme / fichier / spritesheet / bip synthétisé)
   public/assets/      fichiers PNG/SVG/spritesheets
 ```
 
 ## Ajouter un mini-jeu
 
 1. Créer `client/src/games/<nom>/index.ts` qui exporte un `MiniGame` (voir `games/types.ts`).
+   Il travaille en pixels virtuels (`SCREEN_W` × `SCREEN_H`), le runner gère la mise à l'échelle.
    Tout l'aléatoire passe par `mulberry32(seed)` de `@nsmb/shared`, jamais `Math.random()`.
 2. Ajouter ses clés de textures dans `client/src/assets/manifest.ts`.
 3. L'enregistrer dans `client/src/games/index.ts` et ajouter son id à `GameId` (`shared/src/events.ts`).
@@ -44,6 +45,7 @@ client/
 ## Remplacer les graphismes
 
 Déposer les fichiers dans `client/public/assets/`, puis changer les entrées du manifeste :
-`{ file: 'perso.png' }` ou `{ sheet: 'persos.json', frame: 'perso.png' }`. Aucun code de jeu à modifier.
+`{ file: 'perso.png' }` ou `{ sheet: 'persos.json', frame: 'perso.png' }` ; pour les sons `{ file: 'voix.mp3' }`.
+Aucun code de jeu à modifier.
 
 Déploiement : voir `DEPLOY.md`.

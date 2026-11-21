@@ -6,15 +6,14 @@ export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 4;
 export const NAME_MAX_LENGTH = 12;
 
-export const ROUNDS_PER_MATCH = 5;
-/** Compte à rebours local avant le "Go". */
-export const COUNTDOWN_MS = 3000;
-/** Temps max pour jouer après le "Go". */
-export const ROUND_LIMIT_MS = 10_000;
-/** Marge accordée aux clients (latence, déconnexion) avant de clore la manche. */
+/** Chrono global de la partie. Il ne défile que pendant le jeu et n'est jamais rechargé. */
+export const MATCH_TIME_MS = 60_000;
+/** Durée max de l'intro d'un niveau côté client (bannière, rideaux), pour le timeout serveur. */
+export const ROUND_INTRO_MAX_MS = 4000;
+/** Marge accordée aux clients (latence, déconnexion) avant de clore un niveau. */
 export const RESULT_GRACE_MS = 5000;
-/** Pause d'affichage du résultat entre deux manches. */
-export const BETWEEN_ROUNDS_MS = 3500;
+/** Animation de fin de niveau (révélation de la cible) avant le niveau suivant. */
+export const ROUND_END_MS = 3800;
 
 export const normalizeCode = (raw: string) =>
   raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CODE_LENGTH);
