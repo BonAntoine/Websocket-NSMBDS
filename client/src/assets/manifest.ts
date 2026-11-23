@@ -12,10 +12,10 @@ export type AssetDef =
   | { sheet: string; frame: string };
 
 export const manifest: Record<string, AssetDef> = {
-  'wanted.face.a': { shape: 'circle', color: '#e63946', letter: 'A' },
-  'wanted.face.b': { shape: 'square', color: '#2a9d8f', letter: 'B' },
-  'wanted.face.c': { shape: 'triangle', color: '#f4a261', letter: 'C' },
-  'wanted.face.d': { shape: 'star', color: '#7b61ff', letter: 'D' },
+  'wanted.face.a': { file: 'icon_face_a.png' },
+  'wanted.face.b': { file: 'icon_face_b.png' },
+  'wanted.face.c': { file: 'icon_face_c.png' },
+  'wanted.face.d': { file: 'icon_face_d.png' },
 };
 
 // Sons, même principe :
