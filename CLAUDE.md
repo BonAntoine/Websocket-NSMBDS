@@ -44,6 +44,7 @@ Chaque client fait **tourner le jeu en local**, à partir du seed partagé.
 - Chaque client mesure le **temps de réaction depuis son propre "Go"** et l'envoie au serveur. Un joueur qui reçoit le départ 200 ms plus tard démarre aussi son chrono 200 ms plus tard → aucune pénalité.
 - **Échéance** : dès qu'un temps T arrive, le serveur le diffuse (`round:deadline`). Chaque client continue de jouer **jusqu'à T sur son propre chrono**, puis répond `null` s'il n'a pas trouvé. Un joueur en retard réseau n'est donc jamais coupé avant d'avoir eu le même temps.
 - **Le serveur ne déclare jamais le gagnant au premier message reçu** : il attend les résultats de **tous** les joueurs connectés (avec un timeout pour gérer une déconnexion), puis compare les temps. Le premier message arrivé n'est pas forcément le plus rapide.
+- **Page cachée** (onglet en arrière-plan, écran verrouillé) : le navigateur gèle l'animation, donc le client abandonne la manche (`null` immédiat) au lieu de faire attendre les autres — comme sur DS, où le jeu continue sans le joueur absent. Dès qu'une échéance T est connue, le timeout serveur est raccourci à intro max + T + marge.
 - **Triche acceptée** : un client pourrait mentir sur son temps. Partie entre amis → pas de protection anti-triche pour l'instant, ne pas en ajouter.
 
 ## Un seul processus Node en prod

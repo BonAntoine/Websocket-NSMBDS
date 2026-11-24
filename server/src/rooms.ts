@@ -46,6 +46,8 @@ interface Room {
   timeLeftMs: number;
   /** Meilleur temps reçu pour ce niveau : les autres jouent jusqu'à ce temps. */
   deadlineMs: number | null;
+  /** Date.now() à l'envoi de round:start, pour le filet de sécurité. */
+  roundStartedAt: number;
   /** Joueurs connectés au départ du niveau : on attend leur résultat. */
   participants: string[];
   results: Map<string, number | null>;
@@ -111,6 +113,7 @@ export function registerRooms(io: IO) {
     room.round++;
     room.roundOpen = true;
     room.deadlineMs = null;
+    room.roundStartedAt = Date.now();
     room.participants = connectedIds(room);
     room.results = new Map();
     broadcast(room);
@@ -120,8 +123,15 @@ export function registerRooms(io: IO) {
       seed: room.seed,
       timeLeftMs: room.timeLeftMs,
     });
-    // Filet de sécurité si un joueur ne répond jamais.
-    room.timer = setTimeout(() => endRound(room), ROUND_INTRO_MAX_MS + room.timeLeftMs + RESULT_GRACE_MS);
+    // Filet de sécurité si un joueur ne répond jamais (page gelée, réseau coupé…).
+    armSafetyTimer(room, room.timeLeftMs);
+  }
+
+  /** Clôt le niveau si des résultats manquent encore, une fois que chacun a eu `playMs` de jeu (+ intro et marge). */
+  function armSafetyTimer(room: Room, playMs: number) {
+    clearTimeout(room.timer);
+    const delay = room.roundStartedAt + ROUND_INTRO_MAX_MS + playMs + RESULT_GRACE_MS - Date.now();
+    room.timer = setTimeout(() => endRound(room), Math.max(0, delay));
   }
 
   function checkRoundComplete(room: Room) {
@@ -207,6 +217,7 @@ export function registerRooms(io: IO) {
         roundOpen: false,
         timeLeftMs: MATCH_TIME_MS,
         deadlineMs: null,
+        roundStartedAt: 0,
         participants: [],
         results: new Map(),
       };
@@ -257,6 +268,8 @@ export function registerRooms(io: IO) {
       if (valid && (room.deadlineMs === null || t < room.deadlineMs)) {
         room.deadlineMs = t;
         io.to(room.code).emit('round:deadline', { round: room.round, timeMs: t });
+        // Inutile d'attendre au-delà de ce temps : on raccourcit le filet de sécurité.
+        armSafetyTimer(room, t);
       }
       checkRoundComplete(room);
     });

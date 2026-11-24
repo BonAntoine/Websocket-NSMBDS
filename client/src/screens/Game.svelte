@@ -32,12 +32,24 @@
       host.appendChild(app.canvas);
       pixi = app;
     })();
+    // Page cachée (onglet en arrière-plan, écran verrouillé) : le navigateur gèle l'animation,
+    // le joueur ne peut plus trouver. On abandonne la manche pour ne pas faire attendre les autres.
+    const onVisibility = () => document.hidden && forfeit();
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
       unmounted = true;
       current?.instance.destroy();
       pixi?.destroy(true, { children: true });
     };
   });
+
+  /** Abandon de la manche en cours : résultat `null` tout de suite (ignoré si un résultat est déjà parti). */
+  function forfeit() {
+    if (!current || current.finished) return;
+    current.instance.setDeadline(0); // le chrono local s'arrête dès qu'il reprend
+    socket.emit('round:result', { round: current.round, timeMs: null });
+  }
 
   // Chaque client lance l'intro du niveau dès réception, puis son propre "Go".
   $effect(() => {
@@ -59,6 +71,7 @@
       .play()
       .then((timeMs) => socket.emit('round:result', { round: start.round, timeMs }))
       .catch(() => {}); // écran démonté en plein niveau
+    if (document.hidden) forfeit(); // départ reçu alors que la page est déjà cachée
   });
 
   // Quelqu'un a trouvé : on joue jusqu'à son temps sur notre propre chrono.
