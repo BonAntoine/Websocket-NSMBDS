@@ -3,7 +3,7 @@ import { mulberry32 } from '@nsmb/shared';
 import { texture } from '../../assets/assets';
 import { playSound } from '../../assets/sounds';
 import { SCREEN_H, SCREEN_W, type MiniGame, type RoundOutcome } from '../types';
-import { FACES, makeLevel, positionAt, restartFrom, type Picture } from './level';
+import { FACES, POSTER_FACES, makeLevel, positionAt, restartFrom, type Picture } from './level';
 
 // Durées d'origine en images à 60 i/s, converties en ms.
 const FRAME = 1000 / 60;
@@ -84,9 +84,9 @@ export const wanted: MiniGame = {
     const poster = new Graphics().roundRect(78, 40, 100, 122, 6).fill(0xf4e3c1).stroke({ color: 0x1d1b2f, width: 3 });
     const title = text('RECHERCHÉ', 12, 0x8b2e16, false);
     title.position.set(128, 54);
-    const face = new Sprite(texture(FACES[level.wanted]));
+    const face = new Sprite(texture(POSTER_FACES[level.wanted]));
     face.anchor.set(0.5);
-    face.setSize(60);
+    fit(face, 60);
     face.position.set(128, 108);
 
     const curtains = new Container();
@@ -113,7 +113,7 @@ export const wanted: MiniGame = {
     const pics: LivePicture[] = level.pictures.map((p) => {
       const sprite = new Sprite(texture(FACES[p.character]));
       sprite.anchor.set(0.5);
-      sprite.setSize(32);
+      fit(sprite, 32);
       sprite.position.set(p.x, p.y);
       return { origin: p, since: 0, flashFrom: -1, sprite };
     });
@@ -284,3 +284,8 @@ export const wanted: MiniGame = {
     };
   },
 };
+
+/** Met le sprite à l'échelle pour tenir dans un carré de `size` px, sans le déformer. */
+function fit(sprite: Sprite, size: number) {
+  sprite.scale.set(size / Math.max(sprite.texture.width, sprite.texture.height));
+}

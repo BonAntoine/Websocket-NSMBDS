@@ -16,6 +16,8 @@ import {
 } from './boards';
 
 export const FACES = ['wanted.face.a', 'wanted.face.b', 'wanted.face.c', 'wanted.face.d'];
+/** Mêmes personnages en grand format, pour l'avis de recherche. */
+export const POSTER_FACES = ['wanted.poster.a', 'wanted.poster.b', 'wanted.poster.c', 'wanted.poster.d'];
 const FPS = 60;
 
 /** Un personnage : point de départ (centre, px DS) et mouvement. */

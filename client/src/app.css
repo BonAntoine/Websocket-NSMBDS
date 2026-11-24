@@ -26,6 +26,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  background: var(--bg);
 }
 h1 { margin: 8px 0; text-align: center; }
 button, input {

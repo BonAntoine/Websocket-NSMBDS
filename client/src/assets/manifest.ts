@@ -16,6 +16,11 @@ export const manifest: Record<string, AssetDef> = {
   'wanted.face.b': { file: 'icon_face_b.png' },
   'wanted.face.c': { file: 'icon_face_c.png' },
   'wanted.face.d': { file: 'icon_face_d.png' },
+  // Version grand format, affichée sur l'avis de recherche (écran du haut).
+  'wanted.poster.a': { file: 'face_a.png' },
+  'wanted.poster.b': { file: 'face_b.png' },
+  'wanted.poster.c': { file: 'face_c.png' },
+  'wanted.poster.d': { file: 'face_d.png' },
 };
 
 // Sons, même principe :
