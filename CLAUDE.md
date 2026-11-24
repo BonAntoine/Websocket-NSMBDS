@@ -64,6 +64,7 @@ Chaque client fait **tourner le jeu en local**, à partir du seed partagé.
 ## Format mobile
 
 - **Portrait**, deux "écrans" empilés façon DS : écran du haut = infos (le personnage recherché, et en bas la barre des scores dessinée par le runner), écran du bas = zone tactile de jeu (fond noir).
+- **Paysage** (ou fenêtre large) : les deux écrans passent côte à côte, zone tactile à droite. `client/src/game/round.ts` choisit la disposition qui les affiche le plus grand et la recalcule à chaque redimensionnement ; les mini-jeux n'en savent rien.
 - Entrées via les pointer events de PixiJS.
 
 ## Assets (remplaçables)

@@ -12,7 +12,7 @@ export interface RoundHandle extends RoundInstance {
 
 /**
  * Prépare la scène d'un niveau : deux écrans virtuels de SCREEN_W × SCREEN_H, mis à l'échelle
- * pour tenir dans le canvas sans déformation. Les jeux raisonnent en pixels "DS" : même
+ * pour tenir dans le canvas sans déformation, empilés ou côte à côte (voir layout). Les jeux raisonnent en pixels "DS" : même
  * sensation sur tous les appareils (tailles, vitesses, zones de toucher proportionnelles).
  */
 export function createRound(
@@ -21,19 +21,17 @@ export function createRound(
   params: Pick<GameView, 'round' | 'seed' | 'timeLeftMs' | 'onMiss'>,
 ): RoundHandle {
   clearStage(app);
-  const { width, height } = app.screen;
-  const totalH = SCREEN_H * 2 + GAP;
-  const scale = Math.min(width / SCREEN_W, height / totalH);
-  const textResolution = scale * app.renderer.resolution;
-
   const root = new Container();
-  root.scale.set(scale);
-  root.position.set((width - SCREEN_W * scale) / 2, (height - totalH * scale) / 2);
   const top = maskedScreen();
   const bottom = maskedScreen();
-  bottom.y = SCREEN_H + GAP;
   root.addChild(top, bottom);
   app.stage.addChild(root);
+  const relayout = () => layout(root, bottom, app.screen.width, app.screen.height);
+  relayout();
+  // Netteté des textes calculée pour la taille de départ : un redimensionnement en cours de niveau
+  // peut les rendre un peu flous jusqu'au niveau suivant.
+  const textResolution = root.scale.x * app.renderer.resolution;
+  app.renderer.on('resize', relayout);
 
   const instance = game.create({ ...params, top, bottom, ticker: app.ticker, textResolution });
 
@@ -45,10 +43,27 @@ export function createRound(
     ...instance,
     setScores: (players, meId) => drawScores(scores, players, meId, textResolution),
     destroy: () => {
+      app.renderer.off('resize', relayout);
       instance.destroy();
       clearStage(app);
     },
   };
+}
+
+/**
+ * Place les deux écrans : empilés (portrait, façon DS) ou côte à côte (paysage, écran tactile à droite),
+ * selon la disposition qui les affiche le plus grand. Recalculé à chaque redimensionnement.
+ */
+function layout(root: Container, bottom: Container, width: number, height: number) {
+  const stacked = Math.min(width / SCREEN_W, height / (SCREEN_H * 2 + GAP));
+  const sideBySide = Math.min(width / (SCREEN_W * 2 + GAP), height / SCREEN_H);
+  const side = sideBySide > stacked;
+  const scale = Math.max(stacked, sideBySide);
+  bottom.position.set(side ? SCREEN_W + GAP : 0, side ? 0 : SCREEN_H + GAP);
+  const totalW = side ? SCREEN_W * 2 + GAP : SCREEN_W;
+  const totalH = side ? SCREEN_H : SCREEN_H * 2 + GAP;
+  root.scale.set(scale);
+  root.position.set((width - totalW * scale) / 2, (height - totalH * scale) / 2);
 }
 
 /** Jusqu'à 4 joueurs sur une ligne, 5 à 8 sur deux lignes de 4. */
