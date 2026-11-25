@@ -20,6 +20,8 @@ export const roomCodeStore = {
 };
 
 // L'auth est réévaluée à chaque (re)connexion : le serveur nous replace dans notre room.
+// path suit le base Vite : '/socket.io' en dev, '/game/socket.io' si buildé avec --base=/game/.
 export const socket: Socket<ServerToClient, ClientToServer> = io({
+  path: `${import.meta.env.BASE_URL}socket.io`,
   auth: (cb) => cb({ playerId, code: roomCodeStore.get() } satisfies HandshakeAuth),
 });
