@@ -1,5 +1,5 @@
-export type GameId = 'wanted' | 'ghosts';
-export const GAME_IDS: GameId[] = ['wanted', 'ghosts'];
+export type GameId = 'wanted' | 'ghosts' | 'snowball';
+export const GAME_IDS: GameId[] = ['wanted', 'ghosts', 'snowball'];
 export type Phase = 'lobby' | 'playing' | 'results';
 
 export interface PlayerInfo {
@@ -27,6 +27,8 @@ export interface RoundStart {
   seed: number;
   /** Chrono global restant au début du niveau. */
   timeLeftMs: number;
+  /** Joueurs qui participent au niveau, dans l'ordre de la room (grille de départ de la course). */
+  participants: string[];
 }
 
 /** Un joueur a trouvé en `timeMs` : les autres jouent jusqu'à ce temps sur leur propre chrono. */
@@ -66,8 +68,16 @@ export interface ClientToServer {
   /** L'hôte choisit le mini-jeu (lobby / résultats uniquement). */
   'room:game': (p: { game: GameId }) => void;
   'game:start': () => void;
-  /** Temps depuis le "Go" local si trouvé, null si l'échéance est atteinte sans trouver. */
-  'round:result': (p: { round: number; timeMs: number | null }) => void;
+  /**
+   * Temps depuis le "Go" local si l'objectif est atteint (trouvé, ligne d'arrivée), null sinon.
+   * distance : course, part du parcours effectuée (0..1), pour classer ceux qui ne sont pas arrivés.
+   */
+  'round:result': (p: { round: number; timeMs: number | null; distance?: number }) => void;
+  /**
+   * Message de jeu relayé tel quel aux autres joueurs de la room (ou au seul `to`) : positions en direct,
+   * chocs… lossy : peut être perdu si le réseau sature (positions envoyées en continu).
+   */
+  'round:relay': (p: { round: number; data: unknown; to?: string; lossy?: boolean }) => void;
   /**
    * Cache-cache : j'ai débusqué l'objet `item` à `timeMs` depuis mon "Go".
    * `total` : nombre d'objets du niveau (chaque client le calcule à partir du seed).
@@ -82,5 +92,6 @@ export interface ServerToClient {
   'round:start': (r: RoundStart) => void;
   'round:deadline': (d: RoundDeadline) => void;
   'round:taken': (t: RoundTaken) => void;
+  'round:relay': (p: { round: number; from: string; data: unknown }) => void;
   'round:end': (r: RoundEnd) => void;
 }

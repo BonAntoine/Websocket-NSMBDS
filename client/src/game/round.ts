@@ -18,7 +18,7 @@ export interface RoundHandle extends RoundInstance {
 export function createRound(
   app: Application,
   game: MiniGame,
-  params: Pick<GameView, 'round' | 'seed' | 'timeLeftMs' | 'onMiss' | 'claim'>,
+  params: Pick<GameView, 'round' | 'seed' | 'timeLeftMs' | 'onMiss' | 'claim' | 'players' | 'meId' | 'relay'>,
 ): RoundHandle {
   clearStage(app);
   const root = new Container();
@@ -37,6 +37,7 @@ export function createRound(
 
   const scores = new Container();
   scores.y = SCREEN_H - SCORE_BAR_H;
+  scores.visible = game.scoreBar !== false;
   top.addChild(scores); // ajoutée après le jeu : toujours au premier plan
 
   return {

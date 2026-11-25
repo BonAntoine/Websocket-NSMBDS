@@ -42,6 +42,10 @@ function drawShape(shape: Shape, color: string, letter?: string): HTMLCanvasElem
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = SIZE;
   const ctx = canvas.getContext('2d')!;
+  if (shape === 'pattern') {
+    pattern(ctx, color);
+    return canvas;
+  }
   const c = SIZE / 2;
   const r = SIZE / 2 - 6;
 
@@ -77,6 +81,26 @@ function drawShape(shape: Shape, color: string, letter?: string): HTMLCanvasElem
     ctx.fillText(letter, c, c + (shape === 'triangle' ? r * 0.25 : 4));
   }
   return canvas;
+}
+
+/** Motif plein et moucheté (taches claires et sombres), raccordé sur ses bords pour être répété. */
+function pattern(ctx: CanvasRenderingContext2D, color: string) {
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, SIZE, SIZE);
+  let h = 0x2545f491;
+  const rand = () => ((h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d) + 0x6d2b79f5) >>> 0) / 4294967296;
+  for (let i = 0; i < 70; i++) {
+    const x = rand() * SIZE;
+    const y = rand() * SIZE;
+    const r = 2 + rand() * 7;
+    ctx.fillStyle = i % 2 ? 'rgba(29, 27, 47, 0.13)' : 'rgba(255, 255, 255, 0.35)';
+    for (const dx of [-SIZE, 0, SIZE])
+      for (const dy of [-SIZE, 0, SIZE]) {
+        ctx.beginPath();
+        ctx.arc(x + dx, y + dy, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+  }
 }
 
 /** Fantôme générique : dôme, corps droit, bas ondulé (3 pointes). */

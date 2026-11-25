@@ -39,6 +39,12 @@
     };
     socket.on('round:taken', onTaken);
 
+    // Jeux en direct (course) : positions et chocs des autres joueurs.
+    const onRelay = (m: { round: number; from: string; data: unknown }) => {
+      if (current?.round === m.round) current.instance.onRelay?.(m.from, m.data);
+    };
+    socket.on('round:relay', onRelay);
+
     // Page cachée (onglet en arrière-plan, écran verrouillé) : le navigateur gèle l'animation,
     // le joueur ne peut plus trouver. On abandonne la manche pour ne pas faire attendre les autres.
     const onVisibility = () => document.hidden && forfeit();
@@ -46,6 +52,7 @@
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
       socket.off('round:taken', onTaken);
+      socket.off('round:relay', onRelay);
       unmounted = true;
       current?.instance.destroy();
       pixi?.destroy(true, { children: true });
@@ -55,8 +62,9 @@
   /** Abandon de la manche en cours : résultat `null` tout de suite (ignoré si un résultat est déjà parti). */
   function forfeit() {
     if (!current || current.finished) return;
+    const partial = current.instance.currentResult?.();
     current.instance.setDeadline(0); // le chrono local s'arrête dès qu'il reprend
-    socket.emit('round:result', { round: current.round, timeMs: null });
+    socket.emit('round:result', { round: current.round, timeMs: null, distance: partial?.distance });
   }
 
   // Chaque client lance l'intro du niveau dès réception, puis son propre "Go".
@@ -70,6 +78,10 @@
       timeLeftMs: start.timeLeftMs,
       onMiss: () => socket.emit('round:miss', { round: start.round }),
       claim: (item, timeMs, total) => socket.emit('round:claim', { round: start.round, item, timeMs, total }),
+      players: start.participants.map((id) => ({ id, name: untrack(() => playerName(id)) })),
+      meId: playerId,
+      relay: (data, opts) =>
+        (opts?.lossy ? socket.volatile : socket).emit('round:relay', { round: start.round, data, ...opts }),
     });
     current = { round: start.round, instance, finished: false };
     hasRound = true;

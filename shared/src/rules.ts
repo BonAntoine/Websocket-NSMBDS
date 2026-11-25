@@ -9,7 +9,9 @@ export const MAX_PLAYERS = 8;
 export const NAME_MAX_LENGTH = 12;
 
 /** Chrono global de la partie, par mini-jeu. Il ne défile que pendant le jeu et n'est jamais rechargé. */
-export const MATCH_TIME_MS: Record<GameId, number> = { wanted: 60_000, ghosts: 45_000 };
+export const MATCH_TIME_MS: Record<GameId, number> = { wanted: 60_000, ghosts: 45_000, snowball: 60_000 };
+/** Course : points d'un joueur arrivé ; les autres ont un entier proportionnel à la distance (0..FINISH_POINTS-1). */
+export const FINISH_POINTS = 10;
 /** Cache-cache : nombre max d'objets à se partager dans un niveau (16 fantômes). */
 export const MAX_ROUND_ITEMS = 16;
 /**

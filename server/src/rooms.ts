@@ -8,6 +8,7 @@ import {
   MAX_PLAYERS,
   MAX_ROUND_ITEMS,
   CLAIM_WINDOW_MS,
+  FINISH_POINTS,
   MIN_PLAYERS,
   NAME_MAX_LENGTH,
   RESULT_GRACE_MS,
@@ -56,6 +57,8 @@ interface Room {
   /** Joueurs connectés au départ du niveau : on attend leur résultat. */
   participants: string[];
   results: Map<string, number | null>;
+  /** Course : part du parcours effectuée par joueur (0..1). */
+  distances: Map<string, number>;
   timer?: NodeJS.Timeout;
   /** Cache-cache : nombre de fantômes du niveau, annonces en attente d'arbitrage, fantômes attribués. */
   itemTotal: number;
@@ -126,6 +129,7 @@ export function registerRooms(io: IO) {
     room.roundStartedAt = Date.now();
     room.participants = connectedIds(room);
     room.results = new Map();
+    room.distances = new Map();
     room.itemTotal = 0;
     room.taken = new Map();
     for (const c of room.claims.values()) clearTimeout(c.timer);
@@ -136,6 +140,7 @@ export function registerRooms(io: IO) {
       game: room.game,
       seed: room.seed,
       timeLeftMs: room.timeLeftMs,
+      participants: room.participants,
     });
     // Filet de sécurité si un joueur ne répond jamais (page gelée, réseau coupé…).
     armSafetyTimer(room, room.timeLeftMs);
@@ -189,6 +194,15 @@ export function registerRooms(io: IO) {
       const all = room.itemTotal > 0 && room.taken.size >= room.itemTotal;
       const last = Math.max(0, ...[...room.taken.values()].map((t) => t.timeMs));
       room.timeLeftMs = all ? Math.max(0, room.timeLeftMs - last) : 0;
+    } else if (room.game === 'snowball') {
+      // Une seule course par partie : les arrivés marquent FINISH_POINTS, les autres selon la distance.
+      for (const id of room.participants) {
+        const player = room.players.get(id);
+        if (!player) continue;
+        const d = room.distances.get(id) ?? 0;
+        player.score += times[id] !== null ? FINISH_POINTS : Math.min(FINISH_POINTS - 1, Math.floor(d * FINISH_POINTS));
+      }
+      room.timeLeftMs = 0;
     } else {
       // Wanted! : +1 au plus rapide ; le chrono global a défilé jusqu'à sa trouvaille.
       const winner = winnerId ? room.players.get(winnerId) : undefined;
@@ -260,6 +274,7 @@ export function registerRooms(io: IO) {
         roundStartedAt: 0,
         participants: [],
         results: new Map(),
+        distances: new Map(),
         itemTotal: 0,
         claims: new Map(),
         taken: new Map(),
@@ -314,8 +329,11 @@ export function registerRooms(io: IO) {
       const t = p.timeMs;
       const valid = typeof t === 'number' && Number.isFinite(t) && t >= 0 && t <= room.timeLeftMs;
       room.results.set(playerId, valid ? t : null);
-      // Premier (ou meilleur) temps : les autres jouent jusqu'à ce temps sur leur propre chrono, puis répondent.
-      if (valid && (room.deadlineMs === null || t < room.deadlineMs)) {
+      const d = Number(p.distance);
+      if (Number.isFinite(d)) room.distances.set(playerId, Math.min(1, Math.max(0, d)));
+      // Wanted! : premier (ou meilleur) temps, les autres jouent jusqu'à ce temps sur leur propre chrono.
+      // (La course, elle, attend que tout le monde arrive ou que le chrono soit écoulé.)
+      if (room.game === 'wanted' && valid && (room.deadlineMs === null || t < room.deadlineMs)) {
         room.deadlineMs = t;
         io.to(room.code).emit('round:deadline', { round: room.round, timeMs: t });
         // Inutile d'attendre au-delà de ce temps : on raccourcit le filet de sécurité.
@@ -339,6 +357,20 @@ export function registerRooms(io: IO) {
       }
       const r = room;
       room.claims.set(item, { playerId, timeMs, timer: setTimeout(() => award(r, item), CLAIM_WINDOW_MS) });
+    });
+
+    socket.on('round:relay', (p) => {
+      if (!room?.roundOpen || p?.round !== room.round || !room.participants.includes(playerId)) return;
+      if (JSON.stringify(p.data ?? null).length > 512) return;
+      const msg = { round: room.round, from: playerId, data: p.data };
+      if (typeof p.to === 'string') {
+        const target = room.players.get(p.to)?.socketId;
+        if (target) io.to(target).emit('round:relay', msg);
+      } else if (p.lossy) {
+        socket.volatile.to(room.code).emit('round:relay', msg);
+      } else {
+        socket.to(room.code).emit('round:relay', msg);
+      }
     });
 
     socket.on('round:miss', (p) => {

@@ -45,6 +45,7 @@ Chaque client fait **tourner le jeu en local**, à partir du seed partagé.
 - **Échéance** : dès qu'un temps T arrive, le serveur le diffuse (`round:deadline`). Chaque client continue de jouer **jusqu'à T sur son propre chrono**, puis répond `null` s'il n'a pas trouvé. Un joueur en retard réseau n'est donc jamais coupé avant d'avoir eu le même temps.
 - **Le serveur ne déclare jamais le gagnant au premier message reçu** : il attend les résultats de **tous** les joueurs connectés (avec un timeout pour gérer une déconnexion), puis compare les temps. Le premier message arrivé n'est pas forcément le plus rapide.
 - **Page cachée** (onglet en arrière-plan, écran verrouillé) : le navigateur gèle l'animation, donc le client abandonne la manche (`null` immédiat) au lieu de faire attendre les autres — comme sur DS, où le jeu continue sans le joueur absent. Dès qu'une échéance T est connue, le timeout serveur est raccourci à intro max + T + marge.
+- **Exceptions à « un message par manche »** : cache-cache (un message par fantôme trouvé) et descente (positions en direct + chocs, via le relais générique `round:relay`).
 - **Triche acceptée** : un client pourrait mentir sur son temps. Partie entre amis → pas de protection anti-triche pour l'instant, ne pas en ajouter.
 
 ## Un seul processus Node en prod
@@ -94,6 +95,14 @@ Chaque mini-jeu est un **module isolé** (ex. `client/src/games/wanted/`) qui re
   - chacun garde son propre noir ; les fantômes mobiles réagissent à la lumière de chacun, leur position peut donc différer un peu d'un écran à l'autre (seule l'attribution est partagée) ;
   - simulation à pas fixe de 60 i/s (déterministe pendant l'intro, identique pour tous) ;
   - tables marquées `[DEVINÉ]` dans `games/ghosts/level.ts` (pas de ROM).
+- **Descente en boule de neige** (`client/src/games/snowball/`) — portage du Snowball Slalom solo de SM64DS (source : `../sm64ds-decomp/src/minigames/d_s_mg_snowball.cpp`, variante courte), règles de la course multijoueur de NSMB DS, nom et visuels génériques :
+  - circuit généré par `BuildCourse` porté tel quel (seed partagé → même circuit), défilant sur les deux écrans comme un seul terrain (80 px cachés entre les deux, comme sur DS) ; physique d'origine (glissé du doigt, 32 sondes de collision, grossissement en descente, obstacles) ; simulation à pas fixe de 60 i/s ;
+  - grille de départ : 4 par ligne (une place libre de chaque côté), joueurs 5 à 8 sur une 2e ligne ;
+  - **positions en direct** (`round:relay`, lossy, 15/s) relayées par le serveur sans les stocker ; les autres sont affichés avec ~100 ms de retard (interpolation) ;
+  - **chocs** : seule la boule de derrière détecte le contact ; elle ralentit et perd un peu de neige, et envoie la poussée à la seule cible (`round:relay` avec `to`), qui est projetée vers l'avant (selon la vitesse de l'autre, pas la taille). Coefficients `[DEVINÉ]` en tête de `games/snowball/index.ts` ;
+  - une seule course par partie : on attend que tout le monde arrive, ou 60 s (`MATCH_TIME_MS.snowball`) ; arrivés : `FINISH_POINTS` (10), les autres un entier selon la distance (barème provisoire) ;
+  - boule « 3D » sans Three.js : texture `snowball.ball` projetée sur une sphère éclairée, calculée dans un petit canvas (`games/snowball/sphere.ts`) ;
+  - pas de barre des scores (`scoreBar: false`) : la place en direct (1er, 2e…) est affichée sur l'écran du bas.
 - **Choix du jeu** : l'hôte le choisit dans le lobby ou l'écran de résultats (`room:game`). Nom, règle et icône (clé `menu.*` du manifeste) dans `client/src/games/index.ts`.
 - **Trampoline Time** — plus tard. Le joueur trace des trampolines au doigt, des personnages rebondissent dessus ; rendu en 3D dans l'original. Options à trancher le moment venu : Three.js pour ce jeu uniquement, ou fausse 3D dans PixiJS.
 

@@ -3,8 +3,9 @@
 //   { file: 'perso-rouge.png' }                        → image PNG/SVG
 //   { sheet: 'persos.json', frame: 'rouge.png' }       → frame d'une spritesheet (format Pixi/TexturePacker)
 //   { shape: 'circle', color: '#e63946', letter: 'A' } → forme générée (prototype)
+//   { shape: 'pattern', color: '#eef3fb' }              → motif plein et moucheté, répétable (sols, textures)
 
-export type Shape = 'circle' | 'square' | 'triangle' | 'star' | 'diamond' | 'ghost';
+export type Shape = 'circle' | 'square' | 'triangle' | 'star' | 'diamond' | 'ghost' | 'pattern';
 
 export type AssetDef =
   | { shape: Shape; color: string; letter?: string }
@@ -24,9 +25,21 @@ export const manifest: Record<string, AssetDef> = {
 
   'ghosts.ghost': { shape: 'ghost', color: '#f4f1ea' },
 
+  // Descente : sol, roche et ligne de but (répétés en motif), texture plaquée sur la boule (projection
+  // équirectangulaire : largeur = tour complet), obstacles et décors.
+  'snowball.ground': { shape: 'pattern', color: '#eef3fb' },
+  'snowball.wall': { shape: 'pattern', color: '#5b6f8f' },
+  'snowball.goal': { shape: 'pattern', color: '#e63946' },
+  'snowball.ball': { shape: 'pattern', color: '#f4f8ff' },
+  'snowball.obstacle': { shape: 'circle', color: '#8d99ae' },
+  'snowball.tree': { shape: 'triangle', color: '#2a9d8f' },
+  'snowball.prop': { shape: 'diamond', color: '#9aa5b1' },
+  'snowball.deco': { shape: 'circle', color: '#dfe7f2' },
+
   // Icônes du menu de choix du mini-jeu (lobby).
   'menu.wanted': { file: 'face_a.png' },
   'menu.ghosts': { shape: 'ghost', color: '#f4f1ea' },
+  'menu.snowball': { shape: 'circle', color: '#e8f1ff', letter: '❄' },
 };
 
 // Sons, même principe :
@@ -56,5 +69,14 @@ export const sounds: Record<string, SoundDef> = {
   'ghosts.escape': { synth: 'sine', notes: [[700, 10], [300, 500]], slide: true, volume: 0.4 },
   'ghosts.tick': { synth: 'square', notes: [[1200, 30]], volume: 0.12 },
   'ghosts.tick.urgent': { synth: 'square', notes: [[1600, 40], [0, 40], [1600, 40]], volume: 0.15 },
+  'snowball.count': { synth: 'square', notes: [[660, 120]], volume: 0.3 },
+  'snowball.go': { synth: 'square', notes: [[1320, 300]], volume: 0.3 },
+  'snowball.tick': { synth: 'square', notes: [[1200, 30]], volume: 0.1 },
+  'snowball.roll': { synth: 'triangle', notes: [[110, 60]], volume: 0.25 },
+  'snowball.wall': { synth: 'square', notes: [[160, 50]], volume: 0.3 },
+  'snowball.hit': { synth: 'sawtooth', notes: [[300, 10], [90, 160]], slide: true, volume: 0.35 },
+  'snowball.bump': { synth: 'triangle', notes: [[220, 10], [520, 90]], slide: true, volume: 0.4 },
+  'snowball.finish': { synth: 'triangle', notes: [[784, 80], [988, 80], [1175, 80], [1568, 220]], volume: 0.5 },
+  'snowball.melt': { synth: 'sine', notes: [[600, 10], [150, 600]], slide: true, volume: 0.4 },
   'ghosts.point': { synth: 'square', notes: [[1047, 40]], volume: 0.2 },
 };
