@@ -87,6 +87,13 @@ Chaque mini-jeu est un **module isolé** (ex. `client/src/games/wanted/`) qui re
   - progression d'origine : plateaux 1 à 20 dans l'ordre, puis tirage parmi 11–20 ; transition spéciale tous les 5 niveaux ;
   - jeu en **pixels DS virtuels** (deux écrans 256 × 192 mis à l'échelle) : vitesses, zones de toucher, tailles d'origine.
   - Tables marquées `[DEVINÉ]` dans `games/wanted/boards.ts` : absentes du dépôt de décompilation (pas de ROM), à corriger si on les retrouve.
+- **Cache-cache fantômes** (`client/src/games/ghosts/`) — mécanique du cache-cache de SM64DS (source : `../sm64ds-decomp/src/minigames/d_s_mg_teresa.cpp`), avec un nom et un personnage génériques (`ghosts.ghost`) :
+  - les fantômes volent lumière allumée, le noir tombe, ils s'y fondent puis on frotte l'écran du bas pour les débusquer (pinceau 8 px, détection et fuite des fantômes mobiles comme l'original) ;
+  - pas de compte à rebours par niveau : même structure que Wanted! — le premier qui débusque tout donne l'échéance, chrono global (`MATCH_TIME_MS.ghosts`) qui ne défile que dans le noir ;
+  - **1 point par fantôme débusqué**, pour chaque joueur, même s'il n'a pas tout trouvé ; à la fin du niveau les fantômes restants réapparaissent et s'enfuient ;
+  - simulation à pas fixe de 60 i/s (déterministe pendant l'intro, identique pour tous) ;
+  - tables marquées `[DEVINÉ]` dans `games/ghosts/level.ts` (pas de ROM).
+- **Choix du jeu** : l'hôte le choisit dans le lobby ou l'écran de résultats (`room:game`). Nom, règle et icône (clé `menu.*` du manifeste) dans `client/src/games/index.ts`.
 - **Trampoline Time** — plus tard. Le joueur trace des trampolines au doigt, des personnages rebondissent dessus ; rendu en 3D dans l'original. Options à trancher le moment venu : Three.js pour ce jeu uniquement, ou fausse 3D dans PixiJS.
 
 ## État actuel / prochaines étapes

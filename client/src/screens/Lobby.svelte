@@ -2,6 +2,7 @@
   import { MAX_PLAYERS, MIN_PLAYERS, type RoomState } from '@nsmb/shared';
   import { playerId, socket } from '../net';
   import { leaveRoom } from '../state.svelte';
+  import GamePicker from './GamePicker.svelte';
 
   let { room }: { room: RoomState } = $props();
 
@@ -22,6 +23,9 @@
     {/each}
   </ul>
   <p class="muted">{room.players.length}/{MAX_PLAYERS} joueurs</p>
+
+  <p class="muted">{isHost ? 'Choisis le mini-jeu' : "Mini-jeu choisi par l'hôte"}</p>
+  <GamePicker selected={room.game} canPick={isHost} />
 
   <div class="spacer"></div>
   {#if isHost}

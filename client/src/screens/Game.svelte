@@ -69,7 +69,7 @@
     if (d?.round === start.round) instance.setDeadline(d.timeMs);
     instance
       .play()
-      .then((timeMs) => socket.emit('round:result', { round: start.round, timeMs }))
+      .then((result) => socket.emit('round:result', { round: start.round, ...result }))
       .catch(() => {}); // écran démonté en plein niveau
     if (document.hidden) forfeit(); // départ reçu alors que la page est déjà cachée
   });

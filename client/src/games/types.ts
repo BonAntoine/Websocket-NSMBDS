@@ -19,7 +19,7 @@ export interface GameView {
   ticker: Ticker;
   /** Résolution à donner aux textes pour qu'ils restent nets une fois l'écran agrandi. */
   textResolution: number;
-  /** À appeler à chaque mauvais toucher (-1 point). */
+  /** À appeler à chaque mauvais toucher (-1 point), pour les jeux qui en pénalisent. */
   onMiss(): void;
 }
 
@@ -29,10 +29,18 @@ export interface RoundOutcome {
   isMe: boolean;
 }
 
+/** Résultat d'un niveau, envoyé au serveur. */
+export interface RoundResult {
+  /** Temps depuis le "Go" local si l'objectif est atteint, null à l'échéance. */
+  timeMs: number | null;
+  /** Points gagnés pendant le niveau, pour les jeux qui en comptent (fantômes débusqués). */
+  points?: number;
+}
+
 export interface RoundInstance {
-  /** Intro puis jeu. Résout avec le temps depuis le "Go" local si trouvé, null à l'échéance. */
-  play(): Promise<number | null>;
-  /** Un joueur a trouvé en `ms` : on joue jusqu'à ce temps-là sur notre propre chrono. */
+  /** Intro puis jeu. Résout une fois l'objectif atteint ou l'échéance passée. */
+  play(): Promise<RoundResult>;
+  /** Un joueur a atteint l'objectif en `ms` : on joue jusqu'à ce temps-là sur notre propre chrono. */
   setDeadline(ms: number): void;
   /** Animation de fin de niveau, une fois le gagnant connu. */
   finish(outcome: RoundOutcome): void;

@@ -4,7 +4,7 @@
 //   { sheet: 'persos.json', frame: 'rouge.png' }       → frame d'une spritesheet (format Pixi/TexturePacker)
 //   { shape: 'circle', color: '#e63946', letter: 'A' } → forme générée (prototype)
 
-export type Shape = 'circle' | 'square' | 'triangle' | 'star' | 'diamond';
+export type Shape = 'circle' | 'square' | 'triangle' | 'star' | 'diamond' | 'ghost';
 
 export type AssetDef =
   | { shape: Shape; color: string; letter?: string }
@@ -21,6 +21,12 @@ export const manifest: Record<string, AssetDef> = {
   'wanted.poster.b': { file: 'face_b.png' },
   'wanted.poster.c': { file: 'face_c.png' },
   'wanted.poster.d': { file: 'face_d.png' },
+
+  'ghosts.ghost': { shape: 'ghost', color: '#f4f1ea' },
+
+  // Icônes du menu de choix du mini-jeu (lobby).
+  'menu.wanted': { file: 'face_a.png' },
+  'menu.ghosts': { shape: 'ghost', color: '#f4f1ea' },
 };
 
 // Sons, même principe :
@@ -42,4 +48,13 @@ export const sounds: Record<string, SoundDef> = {
   'wanted.fail': { synth: 'sawtooth', notes: [[220, 120], [165, 240]] },
   'wanted.curtain': { synth: 'triangle', notes: [[200, 10], [900, 350]], slide: true, volume: 0.35 },
   'wanted.clear': { synth: 'square', notes: [[523, 100], [659, 100], [784, 100], [1047, 260]] },
+
+  'ghosts.lightsOut': { synth: 'sawtooth', notes: [[600, 10], [120, 300]], slide: true, volume: 0.35 },
+  'ghosts.rub': { synth: 'triangle', notes: [[180, 35]], volume: 0.12 },
+  'ghosts.found': { synth: 'square', notes: [[988, 50], [1319, 90]], volume: 0.4 },
+  'ghosts.allFound': { synth: 'triangle', notes: [[784, 80], [988, 80], [1175, 80], [1568, 220]], volume: 0.5 },
+  'ghosts.escape': { synth: 'sine', notes: [[700, 10], [300, 500]], slide: true, volume: 0.4 },
+  'ghosts.tick': { synth: 'square', notes: [[1200, 30]], volume: 0.12 },
+  'ghosts.tick.urgent': { synth: 'square', notes: [[1600, 40], [0, 40], [1600, 40]], volume: 0.15 },
+  'ghosts.point': { synth: 'square', notes: [[1047, 40]], volume: 0.2 },
 };

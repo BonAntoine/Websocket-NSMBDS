@@ -238,7 +238,7 @@ export const wanted: MiniGame = {
         playing = true;
         every(update);
         update();
-        return result;
+        return { timeMs: await result };
       },
 
       setDeadline(ms) {

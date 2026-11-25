@@ -21,6 +21,15 @@ export function texture(key: string): Texture {
   return t;
 }
 
+/** URL d'image d'une clé du manifeste, pour l'afficher hors du canvas (menus HTML). */
+export function assetUrl(key: string): string {
+  const def = manifest[key];
+  if (!def) throw new Error(`Asset inconnu : ${key}`);
+  if ('file' in def) return BASE + def.file;
+  if ('shape' in def) return drawShape(def.shape, def.color, def.letter).toDataURL();
+  throw new Error(`Asset ${key} : une icône de menu doit être un fichier ou une forme, pas une spritesheet.`);
+}
+
 async function load(def: AssetDef): Promise<Texture> {
   if ('shape' in def) return Texture.from(drawShape(def.shape, def.color, def.letter));
   if ('file' in def) return Assets.load<Texture>(BASE + def.file);
@@ -37,7 +46,8 @@ function drawShape(shape: Shape, color: string, letter?: string): HTMLCanvasElem
   const r = SIZE / 2 - 6;
 
   ctx.beginPath();
-  if (shape === 'circle') ctx.arc(c, c, r, 0, Math.PI * 2);
+  if (shape === 'ghost') ghost(ctx, c, r);
+  else if (shape === 'circle') ctx.arc(c, c, r, 0, Math.PI * 2);
   else if (shape === 'square') ctx.roundRect(c - r * 0.9, c - r * 0.9, r * 1.8, r * 1.8, 16);
   else polygon(ctx, shape === 'star' ? 10 : shape === 'triangle' ? 3 : 4, c, r, shape === 'star' ? 0.5 : 1);
   ctx.closePath();
@@ -46,6 +56,16 @@ function drawShape(shape: Shape, color: string, letter?: string): HTMLCanvasElem
   ctx.lineWidth = 6;
   ctx.strokeStyle = '#1d1b2f';
   ctx.stroke();
+
+  if (shape === 'ghost') {
+    // Yeux.
+    ctx.fillStyle = '#1d1b2f';
+    for (const dx of [-0.3, 0.3]) {
+      ctx.beginPath();
+      ctx.ellipse(c + dx * r, c - 0.15 * r, 0.11 * r, 0.2 * r, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 
   if (letter) {
     ctx.font = `bold ${SIZE * 0.42}px system-ui, sans-serif`;
@@ -57,6 +77,21 @@ function drawShape(shape: Shape, color: string, letter?: string): HTMLCanvasElem
     ctx.fillText(letter, c, c + (shape === 'triangle' ? r * 0.25 : 4));
   }
   return canvas;
+}
+
+/** Fantôme générique : dôme, corps droit, bas ondulé (3 pointes). */
+function ghost(ctx: CanvasRenderingContext2D, c: number, r: number) {
+  const left = c - r * 0.85;
+  const right = c + r * 0.85;
+  const bottom = c + r * 0.95;
+  ctx.arc(c, c - r * 0.1, r * 0.85, Math.PI, 0);
+  ctx.lineTo(right, bottom);
+  const w = (right - left) / 3;
+  for (let i = 0; i < 3; i++) {
+    const x = right - i * w;
+    ctx.quadraticCurveTo(x - w / 4, bottom - r * 0.3, x - w / 2, bottom - r * 0.1);
+    ctx.quadraticCurveTo(x - (3 * w) / 4, bottom - r * 0.3, x - w, bottom);
+  }
 }
 
 /** Polygone régulier (ou étoile si innerRatio < 1, un sommet sur deux rentré). */

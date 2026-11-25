@@ -2,6 +2,7 @@
   import { MIN_PLAYERS, type RoomState } from '@nsmb/shared';
   import { playerId, socket } from '../net';
   import { leaveRoom } from '../state.svelte';
+  import GamePicker from './GamePicker.svelte';
 
   let { room }: { room: RoomState } = $props();
 
@@ -24,6 +25,7 @@
 
   <div class="spacer"></div>
   {#if isHost}
+    <GamePicker selected={room.game} canPick />
     <button onclick={() => socket.emit('game:start')} disabled={connected < MIN_PLAYERS}>Rejouer</button>
   {:else}
     <p class="muted">L'hôte peut relancer une partie. Code : <strong>{room.code}</strong></p>

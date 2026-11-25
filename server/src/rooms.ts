@@ -3,8 +3,10 @@ import type { Server, Socket } from 'socket.io';
 import {
   CODE_ALPHABET,
   CODE_LENGTH,
+  GAME_IDS,
   MATCH_TIME_MS,
   MAX_PLAYERS,
+  MAX_ROUND_POINTS,
   MIN_PLAYERS,
   NAME_MAX_LENGTH,
   RESULT_GRACE_MS,
@@ -12,6 +14,7 @@ import {
   ROUND_INTRO_MAX_MS,
   normalizeCode,
   type ClientToServer,
+  type GameId,
   type HandshakeAuth,
   type JoinAck,
   type Phase,
@@ -37,6 +40,7 @@ interface Room {
   code: string;
   hostId: string;
   phase: Phase;
+  game: GameId;
   players: Map<string, Player>;
   /** Seed de la partie (constant d'un niveau à l'autre). */
   seed: number;
@@ -50,7 +54,7 @@ interface Room {
   roundStartedAt: number;
   /** Joueurs connectés au départ du niveau : on attend leur résultat. */
   participants: string[];
-  results: Map<string, number | null>;
+  results: Map<string, { timeMs: number | null; points: number }>;
   timer?: NodeJS.Timeout;
 }
 
@@ -75,6 +79,7 @@ export function registerRooms(io: IO) {
       code: room.code,
       hostId: room.hostId,
       phase: room.phase,
+      game: room.game,
       round: room.round,
       players: [...room.players.values()].map((p) => ({
         id: p.id,
@@ -119,7 +124,7 @@ export function registerRooms(io: IO) {
     broadcast(room);
     io.to(room.code).emit('round:start', {
       round: room.round,
-      game: 'wanted',
+      game: room.game,
       seed: room.seed,
       timeLeftMs: room.timeLeftMs,
     });
@@ -148,12 +153,17 @@ export function registerRooms(io: IO) {
     const times: Record<string, number | null> = {};
     let winnerId: string | null = null;
     for (const id of room.participants) {
-      const t = room.results.get(id) ?? null;
+      const r = room.results.get(id);
+      const t = r?.timeMs ?? null;
       times[id] = t;
       if (t !== null && (winnerId === null || t < times[winnerId]!)) winnerId = id;
+      // Fantômes : chaque fantôme débusqué rapporte 1 point, qu'on ait tout trouvé ou non.
+      const player = room.players.get(id);
+      if (player && room.game === 'ghosts') player.score += r?.points ?? 0;
     }
     const winner = winnerId ? room.players.get(winnerId) : undefined;
-    if (winner) winner.score++;
+    // Wanted! : +1 au plus rapide.
+    if (winner && room.game === 'wanted') winner.score++;
     // Le chrono global a défilé jusqu'à la trouvaille (ou jusqu'au bout si personne n'a trouvé).
     room.timeLeftMs = winnerId ? Math.max(0, room.timeLeftMs - times[winnerId]!) : 0;
 
@@ -211,11 +221,12 @@ export function registerRooms(io: IO) {
         code: newCode(),
         hostId: playerId,
         phase: 'lobby',
+        game: 'wanted',
         players: new Map(),
         seed: 0,
         round: 0,
         roundOpen: false,
-        timeLeftMs: MATCH_TIME_MS,
+        timeLeftMs: 0,
         deadlineMs: null,
         roundStartedAt: 0,
         participants: [],
@@ -247,13 +258,20 @@ export function registerRooms(io: IO) {
 
     socket.on('room:leave', leaveCurrent);
 
+    socket.on('room:game', (p) => {
+      if (!room || room.hostId !== playerId || room.phase === 'playing') return;
+      if (!GAME_IDS.includes(p?.game)) return;
+      room.game = p.game;
+      broadcast(room);
+    });
+
     socket.on('game:start', () => {
       if (!room || room.hostId !== playerId || room.phase === 'playing') return;
       if (connectedIds(room).length < MIN_PLAYERS) return;
       for (const p of room.players.values()) p.score = 0;
       room.round = 0;
       room.seed = randomInt(2 ** 31);
-      room.timeLeftMs = MATCH_TIME_MS;
+      room.timeLeftMs = MATCH_TIME_MS[room.game];
       room.phase = 'playing';
       startRound(room);
     });
@@ -263,7 +281,9 @@ export function registerRooms(io: IO) {
       if (!room.participants.includes(playerId) || room.results.has(playerId)) return;
       const t = p.timeMs;
       const valid = typeof t === 'number' && Number.isFinite(t) && t >= 0 && t <= room.timeLeftMs;
-      room.results.set(playerId, valid ? t : null);
+      const pts = Number(p.points);
+      const points = Number.isInteger(pts) ? Math.min(MAX_ROUND_POINTS, Math.max(0, pts)) : 0;
+      room.results.set(playerId, { timeMs: valid ? t : null, points });
       // Premier (ou meilleur) temps : les autres jouent jusqu'à ce temps sur leur propre chrono, puis répondent.
       if (valid && (room.deadlineMs === null || t < room.deadlineMs)) {
         room.deadlineMs = t;
