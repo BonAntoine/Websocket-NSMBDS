@@ -6,7 +6,8 @@ import {
   GAME_IDS,
   MATCH_TIME_MS,
   MAX_PLAYERS,
-  MAX_ROUND_POINTS,
+  MAX_ROUND_ITEMS,
+  CLAIM_WINDOW_MS,
   MIN_PLAYERS,
   NAME_MAX_LENGTH,
   RESULT_GRACE_MS,
@@ -54,8 +55,12 @@ interface Room {
   roundStartedAt: number;
   /** Joueurs connectés au départ du niveau : on attend leur résultat. */
   participants: string[];
-  results: Map<string, { timeMs: number | null; points: number }>;
+  results: Map<string, number | null>;
   timer?: NodeJS.Timeout;
+  /** Cache-cache : nombre de fantômes du niveau, annonces en attente d'arbitrage, fantômes attribués. */
+  itemTotal: number;
+  claims: Map<number, { playerId: string; timeMs: number; timer: NodeJS.Timeout }>;
+  taken: Map<number, { playerId: string; timeMs: number }>;
 }
 
 const rooms = new Map<string, Room>();
@@ -121,6 +126,10 @@ export function registerRooms(io: IO) {
     room.roundStartedAt = Date.now();
     room.participants = connectedIds(room);
     room.results = new Map();
+    room.itemTotal = 0;
+    room.taken = new Map();
+    for (const c of room.claims.values()) clearTimeout(c.timer);
+    room.claims = new Map();
     broadcast(room);
     io.to(room.code).emit('round:start', {
       round: room.round,
@@ -145,6 +154,21 @@ export function registerRooms(io: IO) {
     if (!waiting) endRound(room);
   }
 
+  /** Cache-cache : attribue un fantôme au plus rapide de ceux qui l'ont annoncé (+1 point). */
+  function award(room: Room, item: number) {
+    const c = room.claims.get(item);
+    if (!c) return;
+    clearTimeout(c.timer);
+    room.claims.delete(item);
+    room.taken.set(item, { playerId: c.playerId, timeMs: c.timeMs });
+    const player = room.players.get(c.playerId);
+    if (player) player.score++;
+    io.to(room.code).emit('round:taken', { round: room.round, item, playerId: c.playerId, timeMs: c.timeMs });
+    broadcast(room);
+    // Tous les fantômes sont pris : le niveau s'arrête pour tout le monde.
+    if (room.itemTotal > 0 && room.taken.size >= room.itemTotal) endRound(room);
+  }
+
   function endRound(room: Room) {
     if (!room.roundOpen) return;
     room.roundOpen = false;
@@ -153,19 +177,24 @@ export function registerRooms(io: IO) {
     const times: Record<string, number | null> = {};
     let winnerId: string | null = null;
     for (const id of room.participants) {
-      const r = room.results.get(id);
-      const t = r?.timeMs ?? null;
+      const t = room.results.get(id) ?? null;
       times[id] = t;
       if (t !== null && (winnerId === null || t < times[winnerId]!)) winnerId = id;
-      // Fantômes : chaque fantôme débusqué rapporte 1 point, qu'on ait tout trouvé ou non.
-      const player = room.players.get(id);
-      if (player && room.game === 'ghosts') player.score += r?.points ?? 0;
     }
-    const winner = winnerId ? room.players.get(winnerId) : undefined;
-    // Wanted! : +1 au plus rapide.
-    if (winner && room.game === 'wanted') winner.score++;
-    // Le chrono global a défilé jusqu'à la trouvaille (ou jusqu'au bout si personne n'a trouvé).
-    room.timeLeftMs = winnerId ? Math.max(0, room.timeLeftMs - times[winnerId]!) : 0;
+
+    if (room.game === 'ghosts') {
+      // Annonces encore en attente (chrono écoulé pendant l'arbitrage) : on les attribue maintenant.
+      for (const item of [...room.claims.keys()]) award(room, item);
+      // Le chrono global a défilé jusqu'au dernier fantôme pris (ou jusqu'au bout s'il en reste).
+      const all = room.itemTotal > 0 && room.taken.size >= room.itemTotal;
+      const last = Math.max(0, ...[...room.taken.values()].map((t) => t.timeMs));
+      room.timeLeftMs = all ? Math.max(0, room.timeLeftMs - last) : 0;
+    } else {
+      // Wanted! : +1 au plus rapide ; le chrono global a défilé jusqu'à sa trouvaille.
+      const winner = winnerId ? room.players.get(winnerId) : undefined;
+      if (winner) winner.score++;
+      room.timeLeftMs = winnerId ? Math.max(0, room.timeLeftMs - times[winnerId]!) : 0;
+    }
 
     io.to(room.code).emit('round:end', { round: room.round, winnerId, times });
     broadcast(room);
@@ -231,6 +260,9 @@ export function registerRooms(io: IO) {
         roundStartedAt: 0,
         participants: [],
         results: new Map(),
+        itemTotal: 0,
+        claims: new Map(),
+        taken: new Map(),
       };
       const player: Player = { id: playerId, name: cleanName(p?.name), score: 0, socketId: null };
       r.players.set(playerId, player);
@@ -281,9 +313,7 @@ export function registerRooms(io: IO) {
       if (!room.participants.includes(playerId) || room.results.has(playerId)) return;
       const t = p.timeMs;
       const valid = typeof t === 'number' && Number.isFinite(t) && t >= 0 && t <= room.timeLeftMs;
-      const pts = Number(p.points);
-      const points = Number.isInteger(pts) ? Math.min(MAX_ROUND_POINTS, Math.max(0, pts)) : 0;
-      room.results.set(playerId, { timeMs: valid ? t : null, points });
+      room.results.set(playerId, valid ? t : null);
       // Premier (ou meilleur) temps : les autres jouent jusqu'à ce temps sur leur propre chrono, puis répondent.
       if (valid && (room.deadlineMs === null || t < room.deadlineMs)) {
         room.deadlineMs = t;
@@ -292,6 +322,23 @@ export function registerRooms(io: IO) {
         armSafetyTimer(room, t);
       }
       checkRoundComplete(room);
+    });
+
+    socket.on('round:claim', (p) => {
+      if (!room?.roundOpen || room.game !== 'ghosts' || p?.round !== room.round) return;
+      if (!room.participants.includes(playerId)) return;
+      const { item, timeMs, total } = p;
+      if (!Number.isInteger(item) || item < 0 || item >= MAX_ROUND_ITEMS || room.taken.has(item)) return;
+      if (typeof timeMs !== 'number' || !Number.isFinite(timeMs) || timeMs < 0 || timeMs > room.timeLeftMs) return;
+      if (Number.isInteger(total)) room.itemTotal = Math.min(MAX_ROUND_ITEMS, Math.max(1, total));
+      // Le premier message reçu n'est pas forcément le plus rapide : on attend un peu et on garde le meilleur temps.
+      const claim = room.claims.get(item);
+      if (claim) {
+        if (timeMs < claim.timeMs) Object.assign(claim, { playerId, timeMs });
+        return;
+      }
+      const r = room;
+      room.claims.set(item, { playerId, timeMs, timer: setTimeout(() => award(r, item), CLAIM_WINDOW_MS) });
     });
 
     socket.on('round:miss', (p) => {

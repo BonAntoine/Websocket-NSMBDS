@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
   import { Application } from 'pixi.js';
-  import type { RoomState } from '@nsmb/shared';
+  import type { RoomState, RoundTaken } from '@nsmb/shared';
   import { playerId, socket } from '../net';
   import { playerName, store } from '../state.svelte';
   import { loadAssets } from '../assets/assets';
@@ -32,12 +32,20 @@
       host.appendChild(app.canvas);
       pixi = app;
     })();
+    // Cache-cache : un objet attribué par le serveur, à afficher chez tout le monde.
+    const onTaken = (t: RoundTaken) => {
+      if (current?.round !== t.round) return;
+      current.instance.taken?.(t.item, { name: playerName(t.playerId), isMe: t.playerId === playerId }, t.timeMs);
+    };
+    socket.on('round:taken', onTaken);
+
     // Page cachée (onglet en arrière-plan, écran verrouillé) : le navigateur gèle l'animation,
     // le joueur ne peut plus trouver. On abandonne la manche pour ne pas faire attendre les autres.
     const onVisibility = () => document.hidden && forfeit();
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
+      socket.off('round:taken', onTaken);
       unmounted = true;
       current?.instance.destroy();
       pixi?.destroy(true, { children: true });
@@ -61,6 +69,7 @@
       seed: start.seed,
       timeLeftMs: start.timeLeftMs,
       onMiss: () => socket.emit('round:miss', { round: start.round }),
+      claim: (item, timeMs, total) => socket.emit('round:claim', { round: start.round, item, timeMs, total }),
     });
     current = { round: start.round, instance, finished: false };
     hasRound = true;

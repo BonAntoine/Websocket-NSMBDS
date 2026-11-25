@@ -35,6 +35,15 @@ export interface RoundDeadline {
   timeMs: number;
 }
 
+/** Cache-cache : un objet partagé (fantôme) attribué au joueur le plus rapide à l'avoir trouvé. */
+export interface RoundTaken {
+  round: number;
+  item: number;
+  playerId: string;
+  /** Temps depuis le "Go" du joueur qui l'a trouvé. */
+  timeMs: number;
+}
+
 export interface RoundEnd {
   round: number;
   winnerId: string | null;
@@ -57,11 +66,13 @@ export interface ClientToServer {
   /** L'hôte choisit le mini-jeu (lobby / résultats uniquement). */
   'room:game': (p: { game: GameId }) => void;
   'game:start': () => void;
+  /** Temps depuis le "Go" local si trouvé, null si l'échéance est atteinte sans trouver. */
+  'round:result': (p: { round: number; timeMs: number | null }) => void;
   /**
-   * timeMs : temps depuis le "Go" local si l'objectif est atteint (Wanted! : trouvé ; fantômes : tous débusqués),
-   * null si l'échéance est atteinte avant. points : points gagnés pendant le niveau (fantômes débusqués).
+   * Cache-cache : j'ai débusqué l'objet `item` à `timeMs` depuis mon "Go".
+   * `total` : nombre d'objets du niveau (chaque client le calcule à partir du seed).
    */
-  'round:result': (p: { round: number; timeMs: number | null; points?: number }) => void;
+  'round:claim': (p: { round: number; item: number; timeMs: number; total: number }) => void;
   /** Mauvais personnage touché : -1 point. */
   'round:miss': (p: { round: number }) => void;
 }
@@ -70,5 +81,6 @@ export interface ServerToClient {
   'room:state': (s: RoomState) => void;
   'round:start': (r: RoundStart) => void;
   'round:deadline': (d: RoundDeadline) => void;
+  'round:taken': (t: RoundTaken) => void;
   'round:end': (r: RoundEnd) => void;
 }

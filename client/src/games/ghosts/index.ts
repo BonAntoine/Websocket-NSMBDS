@@ -16,8 +16,6 @@ const ROOM_COLOR = 0x4a4270;
 const DARK_RGB = [8, 6, 16];
 const GHOST_SIZE = 16;
 
-const fmt = (ms: number) => `${(ms / 1000).toFixed(2)} s`;
-
 interface LiveGhost {
   g: Ghost;
   sprite: Sprite;
@@ -84,8 +82,19 @@ export const ghosts: MiniGame = {
     bigGhost.position.set(96, 100);
     const counter = text(`0 / ${total}`, 22);
     counter.anchor.set(0, 0.5);
-    counter.position.set(136, 100);
-    top.addChild(new Graphics().rect(0, 0, SCREEN_W, SCREEN_H).fill(0x2b2945), levelLabel, timeLabel, timeValue, bigGhost, counter);
+    counter.position.set(136, 92);
+    const mineLabel = text('à toi : 0', 11, 0xffbf3c, false);
+    mineLabel.anchor.set(0, 0.5);
+    mineLabel.position.set(138, 114);
+    top.addChild(
+      new Graphics().rect(0, 0, SCREEN_W, SCREEN_H).fill(0x2b2945),
+      levelLabel,
+      timeLabel,
+      timeValue,
+      bigGhost,
+      counter,
+      mineLabel,
+    );
 
     // --- Écran du bas : la pièce, les fantômes cachés, le noir, puis ce qui passe devant ------
     const canvas = document.createElement('canvas');
@@ -153,12 +162,18 @@ export const ghosts: MiniGame = {
     let frame = 0;
     let playing = false;
     let done = false;
-    let found = 0;
+    let found = 0; // trouvés sur mon écran (en attente d'attribution ou non)
+    let taken = 0; // attribués par le serveur, à moi ou aux autres
+    let mine = 0;
+    let lastTakenMs = 0;
     let deadline = view.timeLeftMs;
     let shownSeconds = Math.ceil(view.timeLeftMs / 1000);
     let resolveGo: () => void = () => {};
     let resolvePlay: (time: number | null) => void = () => {};
     const exclaims: { t: Text; until: number }[] = [];
+    /** Nom du joueur à qui chaque fantôme a été attribué, affiché au-dessus. */
+    const owners: (Text | null)[] = list.map(() => null);
+    const mineItems = new Set<number>();
 
     /** Temps de jeu depuis le "Go", en ms, au début de l'image `f`. */
     const playTime = (f: number) => (f - GO_FRAME) * FRAME;
@@ -188,11 +203,12 @@ export const ghosts: MiniGame = {
         rub();
       }
 
-      for (const l of list) {
+      for (const [i, l] of list.entries()) {
         const wasFound = stepGhost(l.g, darkness, found);
         if (!wasFound) continue;
         found++;
-        counter.text = `${found} / ${total}`;
+        // Annoncé au serveur, qui l'attribuera au plus rapide de tous les joueurs.
+        view.claim(i, playTime(f), total);
         playSound('ghosts.found', { pan: (l.g.x - 128) / 160 });
         const mark = text('!', 16, 0xffbf3c);
         mark.position.set(l.g.x, Math.max(8, l.g.y - 24));
@@ -200,11 +216,6 @@ export const ghosts: MiniGame = {
         exclaims.push({ t: mark, until: f + EXCLAIM_FRAMES });
       }
       for (const e of exclaims) if (f >= e.until && !e.t.destroyed) e.t.destroy();
-
-      if (playing && !done && found === total) {
-        playSound('ghosts.allFound');
-        stop(playTime(f + 1));
-      }
     }
 
     function render() {
@@ -217,6 +228,8 @@ export const ghosts: MiniGame = {
         sprite.scale.x = Math.abs(sprite.scale.x) * (facesRight(g) ? 1 : -1);
         // Petit flottement, purement visuel.
         sprite.position.set(g.x, g.y + Math.sin(frame / 7 + i * 2));
+        const owner = owners[i];
+        if (owner && !owner.destroyed) owner.position.set(g.x, Math.max(6, sprite.y - 13));
       }
       if (darkness.dirty) {
         darkness.dirty = false;
@@ -238,7 +251,7 @@ export const ghosts: MiniGame = {
       if (done) return;
       done = true;
       touch = rubFrom = null;
-      status.text = time !== null ? `Tous débusqués ! ${fmt(time)}` : deadline < view.timeLeftMs ? 'Trop tard…' : '';
+      status.text = taken === total ? 'Tous débusqués !' : deadline < view.timeLeftMs ? 'Trop tard…' : '';
       resolvePlay(time);
     }
 
@@ -248,8 +261,34 @@ export const ghosts: MiniGame = {
     return {
       async play() {
         await new Promise<void>((r) => (resolveGo = r));
-        const time = await new Promise<number | null>((r) => (resolvePlay = r));
-        return { timeMs: time, points: found };
+        // Les points sont comptés par le serveur à chaque attribution : on signale seulement la fin du jeu local.
+        return { timeMs: await new Promise<number | null>((r) => (resolvePlay = r)) };
+      },
+
+      taken(item, by, timeMs) {
+        const l = list[item];
+        if (!l || owners[item]) return;
+        // Trouvé par un autre : il apparaît chez moi, par-dessus le noir.
+        if (l.g.state !== 'found') {
+          l.g.state = 'found';
+          l.g.fade = 16;
+          l.g.foundOrder = found++;
+          playSound('ghosts.found', { pan: (l.g.x - 128) / 160 });
+        }
+        const owner = text(by.name, 9, by.isMe ? 0xffbf3c : 0xf4f1ea);
+        effects.addChild(owner);
+        owners[item] = owner;
+        taken++;
+        lastTakenMs = Math.max(lastTakenMs, timeMs);
+        if (by.isMe) {
+          mineItems.add(item);
+          mineLabel.text = `à toi : ${++mine}`;
+        }
+        counter.text = `${taken} / ${total}`;
+        if (taken === total && !done) {
+          playSound('ghosts.allFound');
+          stop(null);
+        }
       },
 
       setDeadline(ms) {
@@ -258,19 +297,21 @@ export const ghosts: MiniGame = {
 
       finish(o: RoundOutcome) {
         stop(null);
-        if (o.winnerTimeMs !== null) timeValue.text = String(Math.ceil((view.timeLeftMs - o.winnerTimeMs) / 1000));
-        const headline = o.isMe ? 'Bravo !' : o.winnerName ? `${o.winnerName} les a tous trouvés !` : 'Temps écoulé !';
-        status.text = found ? `${headline} +${found}` : headline;
+        const all = taken === total;
+        if (all) timeValue.text = String(Math.ceil((view.timeLeftMs - lastTakenMs) / 1000));
+        const headline = all ? 'Tous débusqués !' : 'Temps écoulé !';
+        status.text = mine ? `${headline} +${mine}` : headline;
 
         // Les fantômes restants réapparaissent et s'enfuient.
         const left = list.filter((l) => l.g.state === 'hidden');
         for (const { g } of left) [g.state, g.fade, g.timer] = ['fadeIn', 0, 0];
         if (left.length) playSound('ghosts.escape');
 
-        // Les fantômes débusqués comptent leurs points (1, 2, 3…), puis disparaissent dans un nuage.
-        const caught = list.filter((l) => l.g.state === 'found').sort((a, b) => a.g.foundOrder - b.g.foundOrder);
+        // Mes fantômes comptent mes points (1, 2, 3…), puis tous les débusqués disparaissent dans un nuage.
+        const caught = list.filter((l) => l.g.state === 'found');
+        const mineCaught = caught.filter((l) => mineItems.has(list.indexOf(l))).sort((a, b) => a.g.foundOrder - b.g.foundOrder);
         void (async () => {
-          for (const [i, l] of caught.entries()) {
+          for (const [i, l] of mineCaught.entries()) {
             await wait(i === 0 ? 300 : NUMBER_STAGGER_MS);
             const n = text(String(i + 1), 14, 0xffbf3c);
             n.position.set(l.g.x, Math.max(8, l.g.y - 16));
@@ -282,6 +323,8 @@ export const ghosts: MiniGame = {
           await wait(700);
           for (const l of caught) {
             l.g.state = 'gone';
+            const owner = owners[list.indexOf(l)];
+            if (owner && !owner.destroyed) owner.destroy();
             const puff = new Graphics();
             effects.addChild(puff);
             void tween(20 * FRAME, (k) => {

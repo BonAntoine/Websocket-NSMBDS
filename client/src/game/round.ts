@@ -18,7 +18,7 @@ export interface RoundHandle extends RoundInstance {
 export function createRound(
   app: Application,
   game: MiniGame,
-  params: Pick<GameView, 'round' | 'seed' | 'timeLeftMs' | 'onMiss'>,
+  params: Pick<GameView, 'round' | 'seed' | 'timeLeftMs' | 'onMiss' | 'claim'>,
 ): RoundHandle {
   clearStage(app);
   const root = new Container();

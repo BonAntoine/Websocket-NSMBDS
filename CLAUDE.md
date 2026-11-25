@@ -89,8 +89,9 @@ Chaque mini-jeu est un **module isolé** (ex. `client/src/games/wanted/`) qui re
   - Tables marquées `[DEVINÉ]` dans `games/wanted/boards.ts` : absentes du dépôt de décompilation (pas de ROM), à corriger si on les retrouve.
 - **Cache-cache fantômes** (`client/src/games/ghosts/`) — mécanique du cache-cache de SM64DS (source : `../sm64ds-decomp/src/minigames/d_s_mg_teresa.cpp`), avec un nom et un personnage génériques (`ghosts.ghost`) :
   - les fantômes volent lumière allumée, le noir tombe, ils s'y fondent puis on frotte l'écran du bas pour les débusquer (pinceau 8 px, détection et fuite des fantômes mobiles comme l'original) ;
-  - pas de compte à rebours par niveau : même structure que Wanted! — le premier qui débusque tout donne l'échéance, chrono global (`MATCH_TIME_MS.ghosts`) qui ne défile que dans le noir ;
-  - **1 point par fantôme débusqué**, pour chaque joueur, même s'il n'a pas tout trouvé ; à la fin du niveau les fantômes restants réapparaissent et s'enfuient ;
+  - **chasse partagée** : chaque fantôme ne peut être pris qu'une fois. Le client annonce `round:claim` (fantôme, temps depuis son Go) ; le serveur attend `CLAIM_WINDOW_MS` après la première annonce puis l'attribue au **temps le plus court** (`round:taken`, +1 point, nom affiché au-dessus chez tous). Exception assumée à « un message par manche » : un petit message par fantôme ;
+  - le niveau s'arrête dès que tous les fantômes sont attribués ; sinon chrono global (`MATCH_TIME_MS.ghosts`, ne défile que dans le noir) jusqu'à 0, puis les fantômes restants réapparaissent et s'enfuient ;
+  - chacun garde son propre noir ; les fantômes mobiles réagissent à la lumière de chacun, leur position peut donc différer un peu d'un écran à l'autre (seule l'attribution est partagée) ;
   - simulation à pas fixe de 60 i/s (déterministe pendant l'intro, identique pour tous) ;
   - tables marquées `[DEVINÉ]` dans `games/ghosts/level.ts` (pas de ROM).
 - **Choix du jeu** : l'hôte le choisit dans le lobby ou l'écran de résultats (`room:game`). Nom, règle et icône (clé `menu.*` du manifeste) dans `client/src/games/index.ts`.

@@ -21,6 +21,11 @@ export interface GameView {
   textResolution: number;
   /** À appeler à chaque mauvais toucher (-1 point), pour les jeux qui en pénalisent. */
   onMiss(): void;
+  /**
+   * Jeux à objets partagés (cache-cache) : j'ai trouvé l'objet `item` à `timeMs` depuis le "Go".
+   * Le serveur l'attribue au plus rapide et le signale à tous via RoundInstance.taken.
+   */
+  claim(item: number, timeMs: number, total: number): void;
 }
 
 export interface RoundOutcome {
@@ -33,8 +38,6 @@ export interface RoundOutcome {
 export interface RoundResult {
   /** Temps depuis le "Go" local si l'objectif est atteint, null à l'échéance. */
   timeMs: number | null;
-  /** Points gagnés pendant le niveau, pour les jeux qui en comptent (fantômes débusqués). */
-  points?: number;
 }
 
 export interface RoundInstance {
@@ -42,6 +45,8 @@ export interface RoundInstance {
   play(): Promise<RoundResult>;
   /** Un joueur a atteint l'objectif en `ms` : on joue jusqu'à ce temps-là sur notre propre chrono. */
   setDeadline(ms: number): void;
+  /** Jeux à objets partagés : l'objet `item` est attribué à un joueur (moi ou un autre). */
+  taken?(item: number, by: { name: string; isMe: boolean }, timeMs: number): void;
   /** Animation de fin de niveau, une fois le gagnant connu. */
   finish(outcome: RoundOutcome): void;
   destroy(): void;
